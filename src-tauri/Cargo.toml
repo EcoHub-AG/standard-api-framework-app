@@ -1,0 +1,26 @@
+[package]
+name = "standard-api-framework-app"
+version = "0.1.0"
+description = "Standard API Framework"
+authors = ["EcoHub"]
+edition = "2021"
+
+[lib]
+name = "saf_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-http = "2"
+reqwest = { version = "0.12", default-features = false, features = ["native-tls"] }
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
+aes-gcm = "0.10"
+rand = "0.8"
+rdkafka = { version = "0.36", features = ["cmake-build", "ssl-vendored"] }

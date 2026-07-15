@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Standard API Framework",
+  "version": "0.1.0",
+  "identifier": "ch.ecohub.saf.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1421",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Standard API Framework",
+        "width": 1240,
+        "height": 820,
+        "minWidth": 900,
+        "minHeight": 620,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+  }
+}
