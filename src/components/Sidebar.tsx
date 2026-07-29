@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Inbox as InboxIcon, MailOpen, SendHorizontal, Settings, ChevronsUpDown, Plus } from "lucide-react";
+import { Send, Inbox as InboxIcon, SendHorizontal, Settings, ChevronsUpDown, Plus } from "lucide-react";
 import { useApp, type View } from "../store";
-import { inboxFor, outboxFor } from "../lib/bus";
+import { outboxFor } from "../lib/bus";
+import { inboxFor } from "../lib/inboxStore";
 
 const NAV: { group: string; items: { view: View; label: string; icon: any }[] }[] = [
   {
     group: "Data Exchange",
     items: [
       { view: "send", label: "Send event", icon: Send },
-      { view: "receive", label: "Receive event", icon: MailOpen },
       { view: "inbox", label: "Inbox", icon: InboxIcon },
       { view: "outbox", label: "Outbox", icon: SendHorizontal },
     ],
@@ -18,7 +18,7 @@ const NAV: { group: string; items: { view: View; label: string; icon: any }[] }[
 ];
 
 export default function Sidebar() {
-  const { view, setView, active, profiles, switchProfile, configured, setNewProfileOpen, busTick } = useApp();
+  const { view, setView, active, profiles, switchProfile, configured, setNewProfileOpen, busTick, sessionInboxIds } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -27,9 +27,10 @@ export default function Sidebar() {
     return () => document.removeEventListener("click", close);
   }, []);
 
-  const inboxCount = inboxFor(active.credentials.idp || active.id).filter(() => true).length;
+  const inboxCount = inboxFor(active.credentials.idp || active.id).length;
   const outboxCount = outboxFor(active.id).length;
-  void busTick; // recompute counts when the bus changes
+  void busTick; // recompute outbox count when the bus changes
+  void sessionInboxIds; // recompute inbox count whenever a live message is persisted
 
   function badgeFor(v: View): number | string | null {
     if (v === "inbox") return inboxCount || null;

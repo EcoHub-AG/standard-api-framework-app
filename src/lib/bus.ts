@@ -1,5 +1,6 @@
-// Local event bus — stands in for Kafka. Persisted so Send and Receive share it.
-// Phase 2: replace publish/inboxFor with Kafka produce / consume via the sidecar.
+// Local outbox log — a record of events THIS app has produced (real Kafka/REST
+// sends), for the Outbox view. Not a simulated inbox: incoming events come only
+// from live Kafka consumption (see src/lib/inboxStore.ts).
 import type { BusMessage } from "../types";
 import { load, save } from "./storage";
 
@@ -15,10 +16,6 @@ export function publish(msg: BusMessage): void {
 }
 export function update(id: string, patch: Partial<BusMessage>): void {
   save(KEY, all().map((m) => (m.id === id ? { ...m, ...patch } : m)));
-}
-// Events addressed TO this profile (by idp) = its inbox.
-export function inboxFor(idp: string): BusMessage[] {
-  return all().filter((m) => m.toIdp === idp);
 }
 // Events FROM this profile = its outbox.
 export function outboxFor(profileId: string): BusMessage[] {

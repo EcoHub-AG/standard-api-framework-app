@@ -11,7 +11,8 @@
         { "url": "https://services.test-myecohub.ch/*" },
         { "url": "https://dev-ecohub-services-api.azure-api.net/*" },
         { "url": "https://test-ecohub-services-api.azure-api.net/*" },
-        { "url": "https://stg-ecohub-services-api.azure-api.net/*" }
+        { "url": "https://stg-ecohub-services-api.azure-api.net/*" },
+        { "url": "https://raw.githubusercontent.com/*" }
       ]
     }
   ]

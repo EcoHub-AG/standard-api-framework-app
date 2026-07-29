@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X, CheckCircle2, AlertTriangle } from "lucide-react";
 import { copyText } from "../lib/format";
 
-export type Detail = { title: string; status: number; ok: boolean; body: string; url?: string } | null;
+export type Detail = { title: string; status: number; ok: boolean; body: string; url?: string; method?: string; requestBody?: string; curl?: string } | null;
 
 export default function DetailModal({ detail, onClose }: { detail: Detail; onClose: () => void }) {
   return (
@@ -32,10 +32,29 @@ export default function DetailModal({ detail, onClose }: { detail: Detail; onClo
               <button className="banner-x" onClick={onClose} title="Close"><X size={16} /></button>
             </div>
             <div className="modal-body">
+              {detail.url && (
+                <>
+                  <div className="ciph-head"><span className="lbl">Request</span>
+                    {detail.requestBody && <button className="btn-copy" onClick={() => copyText(detail.requestBody!)}>Copy</button>}
+                  </div>
+                  <pre className="code-block" style={{ maxHeight: 160, marginBottom: 12 }}>
+                    {(detail.method ?? "GET") + " " + detail.url}
+                    {detail.requestBody ? "\n\n" + detail.requestBody : ""}
+                  </pre>
+                </>
+              )}
               <div className="ciph-head"><span className="lbl">Response body</span>
                 <button className="btn-copy" onClick={() => copyText(detail.body)}>Copy</button>
               </div>
               <pre className="code-block" style={{ maxHeight: 320 }}>{detail.body || "(empty response body)"}</pre>
+              {!detail.ok && detail.curl && (
+                <>
+                  <div className="ciph-head" style={{ marginTop: 12 }}><span className="lbl">cURL (reproduce this request)</span>
+                    <button className="btn-copy" onClick={() => copyText(detail.curl!)}>Copy</button>
+                  </div>
+                  <pre className="code-block" style={{ maxHeight: 200 }}>{detail.curl}</pre>
+                </>
+              )}
             </div>
             <div className="modal-foot">
               <button className="btn-primary" onClick={onClose}>Close</button>

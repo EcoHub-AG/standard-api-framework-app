@@ -406,6 +406,9 @@ fn kafka_start_consumer(
                     let _ = app.emit("saf-message", serde_json::json!({
                         "rawJson": raw_json,
                         "topic": msg.topic(),
+                        "partition": msg.partition(),
+                        "offset": msg.offset(),
+                        "timestampMs": msg.timestamp().to_millis(),
                     }));
                 }
                 Some(Err(e)) => {

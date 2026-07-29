@@ -5,7 +5,6 @@ import Sidebar from "./components/Sidebar";
 import Banner from "./components/Banner";
 import NewProfileSheet from "./components/NewProfileSheet";
 import SendEvent from "./views/SendEvent";
-import ReceiveEvent from "./views/ReceiveEvent";
 import Inbox from "./views/Inbox";
 import Outbox from "./views/Outbox";
 import Configuration from "./views/Configuration";
@@ -41,7 +40,6 @@ export default function App() {
             style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
           >
             {view === "send" && <SendEvent key={activeId} />}
-            {view === "receive" && <ReceiveEvent key={activeId} />}
             {view === "inbox" && <Inbox key={activeId} />}
             {view === "outbox" && <Outbox key={activeId} />}
             {view === "config" && <Configuration key={activeId} />}

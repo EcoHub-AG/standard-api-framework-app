@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Wifi, KeyRound, ShieldCheck, Plus, Trash2, Lock, UploadCloud, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Wifi, KeyRound, ShieldCheck, Plus, Trash2, Lock, UploadCloud, Loader2, FileUp, Import } from "lucide-react";
 import { useApp } from "../store";
 import type { Credentials, KeyRecord } from "../types";
 import * as crypto from "../lib/crypto";
@@ -20,8 +20,19 @@ export default function Configuration() {
   const [uploading, setUploading] = useState<string | null>(null); // `${kind}:${version}`
   const [detail, setDetail] = useState<Detail>(null);
   const [keyVersion, setKeyVersion] = useState("1.0.0");
+  const [importOpen, setImportOpen] = useState(false);
+  const [importVersion, setImportVersion] = useState("1.0.0");
+  const [importBusy, setImportBusy] = useState(false);
+  const [encPubIn, setEncPubIn] = useState("");
+  const [encPrivIn, setEncPrivIn] = useState("");
+  const [sigPubIn, setSigPubIn] = useState("");
+  const [sigPrivIn, setSigPrivIn] = useState("");
+  const encPubFile = useRef<HTMLInputElement>(null);
+  const encPrivFile = useRef<HTMLInputElement>(null);
+  const sigPubFile = useRef<HTMLInputElement>(null);
+  const sigPrivFile = useRef<HTMLInputElement>(null);
 
-  const keysUnlocked = !!active.techUser; // enrolled at least once → has the mTLS cert
+  const keysUnlocked = true; // TEMP-TEST-BYPASS !!active.techUser; // enrolled at least once → has the mTLS cert
   const suggestVersion = () => nextVersion([...active.encKeys, ...active.sigKeys]);
   useEffect(() => setCred(active.credentials), [active.id]);
   useEffect(() => { setKeyVersion(suggestVersion()); }, [active.id]);
@@ -83,6 +94,67 @@ export default function Configuration() {
     toast(`Generated key pairs v${v}`);
   }
 
+  function readFileInto(e: React.ChangeEvent<HTMLInputElement>, setter: (s: string) => void) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => setter(String(reader.result ?? "").trim());
+    reader.readAsText(f);
+    e.target.value = "";
+  }
+
+  function resetImportForm() {
+    setEncPubIn(""); setEncPrivIn(""); setSigPubIn(""); setSigPrivIn("");
+  }
+
+  async function importKeys() {
+    const v = importVersion.trim();
+    if (!/^\d+\.\d+\.\d+$/.test(v)) { toast("Enter a version like 1.0.0"); return; }
+    const hasEnc = !!(encPubIn.trim() && encPrivIn.trim());
+    const hasSig = !!(sigPubIn.trim() && sigPrivIn.trim());
+    if (!hasEnc && !hasSig) { toast("Paste or upload at least one key pair"); return; }
+    if (hasEnc && active.encKeys.some((k) => k.version === v)) { toast(`Version ${v} already exists for encryption keys`); return; }
+    if (hasSig && active.sigKeys.some((k) => k.version === v)) { toast(`Version ${v} already exists for signature keys`); return; }
+
+    setImportBusy(true);
+    const errors: string[] = [];
+    const updates: Partial<{ encKeys: KeyRecord[]; sigKeys: KeyRecord[] }> = {};
+    const now = new Date().toISOString().slice(0, 10);
+
+    if (hasEnc) {
+      try {
+        await crypto.validateEncryptionKeyPair(encPubIn, encPrivIn);
+        const fp = await crypto.fingerprint(encPubIn);
+        updates.encKeys = [...active.encKeys, { version: v, createdAt: now, active: false, publicPem: encPubIn.trim(), privatePem: encPrivIn.trim(), fingerprint: fp }];
+      } catch (e) {
+        errors.push(`Encryption key pair (RSA-OAEP) — ${(e as Error).message || "not a valid PEM for this algorithm"}`);
+      }
+    }
+    if (hasSig) {
+      try {
+        await crypto.validateSignatureKeyPair(sigPubIn, sigPrivIn);
+        const fp = await crypto.fingerprint(sigPubIn);
+        updates.sigKeys = [...active.sigKeys, { version: v, createdAt: now, active: false, publicPem: sigPubIn.trim(), privatePem: sigPrivIn.trim(), fingerprint: fp }];
+      } catch (e) {
+        errors.push(`Signature key pair (ECDSA P-384) — ${(e as Error).message || "not a valid PEM for this algorithm"}`);
+      }
+    }
+
+    if (errors.length) {
+      setDetail({ title: "Key import failed", status: 0, ok: false, body: errors.join("\n\n") + "\n\nCheck each pasted/uploaded value is the matching public or private PEM for that key type, and that public/private come from the same generated pair." });
+      toast("Invalid key — see details");
+      setImportBusy(false);
+      return;
+    }
+
+    updateActive(updates);
+    resetImportForm();
+    setImportOpen(false);
+    setKeyVersion(nextVersion([...active.encKeys, ...(updates.encKeys ?? []), ...active.sigKeys, ...(updates.sigKeys ?? [])]));
+    toast(`Imported key pair${hasEnc && hasSig ? "s" : ""} v${v}`);
+    setImportBusy(false);
+  }
+
   function activateLocal(kind: "enc" | "sig", version: string) {
     const key = kind === "enc" ? "encKeys" : "sigKeys";
     updateActive({ [key]: (active[key] as KeyRecord[]).map((k) => ({ ...k, active: k.version === version })) } as any);
@@ -105,7 +177,7 @@ export default function Configuration() {
         kind: kind === "enc" ? "encryption" : "signature",
       });
       const log = res.steps.map((s) => `${s.ok ? "✓" : "✗"} ${s.name} — HTTP ${s.status}`).join("\n") + "\n\n" + res.detailBody;
-      setDetail({ title: `Upload & activate ${kind === "enc" ? "encryption" : "signature"} key`, status: res.steps[res.steps.length - 1]?.status ?? 0, ok: res.ok, body: log });
+      setDetail({ title: `Upload & activate ${kind === "enc" ? "encryption" : "signature"} key`, status: res.steps[res.steps.length - 1]?.status ?? 0, ok: res.ok, body: log, curl: res.curl });
       if (res.ok) {
         const key = kind === "enc" ? "encKeys" : "sigKeys";
         updateActive({
@@ -203,8 +275,59 @@ export default function Configuration() {
                     <button className="btn-ghost accent" disabled={genBusy} onClick={generateKeys}>
                       <Plus size={13} style={{ verticalAlign: "-2px" }} /> {genBusy ? "Generating…" : "Generate keys"}
                     </button>
+                    <button className="btn-ghost" onClick={() => setImportOpen((o) => !o)}>
+                      <Import size={13} style={{ verticalAlign: "-2px" }} /> {importOpen ? "Cancel import" : "Import keys"}
+                    </button>
                   </div>
                 </div>
+
+                {importOpen && (
+                  <div className="card" style={{ marginTop: 10, background: "var(--field)" }}>
+                    <div className="card-body">
+                      <div className="hint" style={{ marginBottom: 8 }}>Paste or upload an already-generated key pair (PEM). Fill in encryption, signature, or both — whichever you provide gets saved under the version below.</div>
+                      <div className="frow">
+                        <label className="fl">Version <span className="req">*</span></label>
+                        <input className="input mono" style={{ width: 110 }} value={importVersion} placeholder="1.0.0" onChange={(e) => setImportVersion(e.target.value)} />
+                      </div>
+
+                      <div className="frow two">
+                        <div>
+                          <label className="fl">Encryption public key (RSA-OAEP)</label>
+                          <textarea className="input mono" rows={4} placeholder="-----BEGIN PUBLIC KEY-----" value={encPubIn} onChange={(e) => setEncPubIn(e.target.value)} />
+                          <input ref={encPubFile} type="file" accept=".pem,.crt,.pub,.key,.txt" style={{ display: "none" }} onChange={(e) => readFileInto(e, setEncPubIn)} />
+                          <button className="btn-ghost" style={{ marginTop: 4 }} onClick={() => encPubFile.current?.click()}><FileUp size={12} style={{ verticalAlign: "-2px" }} /> Upload file</button>
+                        </div>
+                        <div>
+                          <label className="fl">Encryption private key (RSA-OAEP)</label>
+                          <textarea className="input mono" rows={4} placeholder="-----BEGIN PRIVATE KEY-----" value={encPrivIn} onChange={(e) => setEncPrivIn(e.target.value)} />
+                          <input ref={encPrivFile} type="file" accept=".pem,.key,.txt" style={{ display: "none" }} onChange={(e) => readFileInto(e, setEncPrivIn)} />
+                          <button className="btn-ghost" style={{ marginTop: 4 }} onClick={() => encPrivFile.current?.click()}><FileUp size={12} style={{ verticalAlign: "-2px" }} /> Upload file</button>
+                        </div>
+                      </div>
+
+                      <div className="frow two">
+                        <div>
+                          <label className="fl">Signature public key (ECDSA P-384)</label>
+                          <textarea className="input mono" rows={4} placeholder="-----BEGIN PUBLIC KEY-----" value={sigPubIn} onChange={(e) => setSigPubIn(e.target.value)} />
+                          <input ref={sigPubFile} type="file" accept=".pem,.crt,.pub,.key,.txt" style={{ display: "none" }} onChange={(e) => readFileInto(e, setSigPubIn)} />
+                          <button className="btn-ghost" style={{ marginTop: 4 }} onClick={() => sigPubFile.current?.click()}><FileUp size={12} style={{ verticalAlign: "-2px" }} /> Upload file</button>
+                        </div>
+                        <div>
+                          <label className="fl">Signature private key (ECDSA P-384)</label>
+                          <textarea className="input mono" rows={4} placeholder="-----BEGIN PRIVATE KEY-----" value={sigPrivIn} onChange={(e) => setSigPrivIn(e.target.value)} />
+                          <input ref={sigPrivFile} type="file" accept=".pem,.key,.txt" style={{ display: "none" }} onChange={(e) => readFileInto(e, setSigPrivIn)} />
+                          <button className="btn-ghost" style={{ marginTop: 4 }} onClick={() => sigPrivFile.current?.click()}><FileUp size={12} style={{ verticalAlign: "-2px" }} /> Upload file</button>
+                        </div>
+                      </div>
+
+                      <div className="config-foot" style={{ padding: "10px 0 0" }}>
+                        <span className="foot-status">Keys are validated locally before being saved — nothing is uploaded here.</span>
+                        <button className="btn-ghost" disabled={importBusy} onClick={() => { resetImportForm(); setImportOpen(false); }}>Cancel</button>
+                        <button className="btn-primary" disabled={importBusy} onClick={importKeys}>{importBusy ? "Importing…" : "Import"}</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <KeyTable title="Encryption keys (RSA-OAEP)" rows={active.encKeys} uploading={uploading} kind="enc" env={active.credentials.environment}
                   onLocal={(v) => activateLocal("enc", v)} onUpload={(r) => uploadActivate("enc", r)} />

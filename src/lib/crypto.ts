@@ -128,6 +128,18 @@ export async function generateSignatureKeyPair(): Promise<KeyPair> {
   };
 }
 
+// ---------- imported key validation ----------
+// Confirms a pasted/uploaded PEM pair is actually usable for the given
+// algorithm before it's saved as a KeyRecord — throws on any mismatch.
+export async function validateEncryptionKeyPair(publicPem: string, privatePem: string): Promise<void> {
+  await subtle.importKey("spki", bs(fromPem(publicPem)), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"]);
+  await subtle.importKey("pkcs8", bs(fromPem(privatePem)), { name: "RSA-OAEP", hash: "SHA-256" }, false, ["decrypt"]);
+}
+export async function validateSignatureKeyPair(publicPem: string, privatePem: string): Promise<void> {
+  await subtle.importKey("spki", bs(fromPem(publicPem)), { name: "ECDSA", namedCurve: "P-384" }, false, ["verify"]);
+  await subtle.importKey("pkcs8", bs(fromPem(privatePem)), { name: "ECDSA", namedCurve: "P-384" }, false, ["sign"]);
+}
+
 export async function fingerprint(publicPem: string): Promise<string> {
   const hash = await subtle.digest("SHA-256", bs(fromPem(publicPem)));
   const hex = [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -144,17 +156,20 @@ export type Envelope = {
 };
 
 export async function encryptAndSign(opts: {
-  cleartext: string;
+  cleartext: string | Uint8Array;
   recipientEncPublicPem: string;
   publicKeyVersion: string;
   signerSigPrivatePem: string;
   signatureKeyVersion: string;
 }): Promise<Envelope> {
   // 1. AES-256 key + GCM encrypt over gzipped content
+  // For binary uploads (e.g. PDFs) opts.cleartext is the raw file bytes — encrypt
+  // those directly. Only string input (typed/pasted text) goes through TextEncoder.
   const rawAes = globalThis.crypto.getRandomValues(new Uint8Array(32));
   const aesKey = await subtle.importKey("raw", bs(rawAes), "AES-GCM", false, ["encrypt"]);
   const nonce = globalThis.crypto.getRandomValues(new Uint8Array(12));
-  const zipped = await gzip(te.encode(opts.cleartext));
+  const rawInput = typeof opts.cleartext === "string" ? te.encode(opts.cleartext) : opts.cleartext;
+  const zipped = await gzip(rawInput);
   const ctAndTag = new Uint8Array(await subtle.encrypt({ name: "AES-GCM", iv: bs(nonce), tagLength: 128 }, aesKey, bs(zipped)));
   const combined = new Uint8Array(nonce.length + ctAndTag.length);
   combined.set(nonce, 0);

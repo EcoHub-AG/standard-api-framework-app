@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { Profile, Role } from "./types";
 import { load, save } from "./lib/storage";
 
-export type View = "send" | "receive" | "inbox" | "outbox" | "config";
+export type View = "send" | "inbox" | "outbox" | "config";
 
 const initials = (name: string) =>
   name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "SAF";
@@ -45,6 +45,10 @@ type Store = {
   bumpBus: () => void;
   newProfileOpen: boolean;
   setNewProfileOpen: (b: boolean) => void;
+  // ids of inbox messages received live during THIS app session (never persisted —
+  // resets on restart), used to badge "new" vs. history loaded from the vault.
+  sessionInboxIds: Set<string>;
+  markReceivedThisSession: (id: string) => void;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -59,6 +63,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [busTick, setBusTick] = useState(0);
   const [newProfileOpen, setNewProfileOpen] = useState(false);
+  const [sessionInboxIds, setSessionInboxIds] = useState<Set<string>>(new Set());
 
   // ensure activeId points at an existing profile
   const resolvedActiveId = useMemo(
@@ -115,6 +120,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     window.clearTimeout((toast as any)._t);
     (toast as any)._t = window.setTimeout(() => setToastMsg(null), 2300);
   }
+  function markReceivedThisSession(id: string) {
+    setSessionInboxIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }
 
   const value: Store = {
     profiles,
@@ -139,6 +147,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     bumpBus: () => setBusTick((t) => t + 1),
     newProfileOpen,
     setNewProfileOpen,
+    sessionInboxIds,
+    markReceivedThisSession,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

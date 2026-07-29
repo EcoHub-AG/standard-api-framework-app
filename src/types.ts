@@ -42,20 +42,19 @@ export type Profile = {
   sigKeys: KeyRecord[];
 };
 
-// A transmitted SAF event sitting on the local bus (stands in for Kafka).
+// A local log entry for an event THIS profile has produced (Outbox view only —
+// incoming events never go through this type, see src/lib/inboxStore.ts).
 export type BusMessage = {
   id: string;
   fromProfileId: string;
   fromName: string;
-  toName: string;        // recipient profile name (self-addressed in local mode)
+  toName: string;
   toIdp: string;
   topic: string;
   standardNs: string;
   subject: string;
   time: string;
   envelope: Envelope;
-  // recipient's encryption public key + sender's signature public key travel
-  // out-of-band here so the demo can decrypt/verify locally.
   recipientEncPublicPem: string;
   signerSigPublicPem: string;
   signerName: string;

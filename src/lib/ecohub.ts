@@ -184,11 +184,16 @@ export type Receiver = {
   membershipId?: string;
   idp: string[];
   companyName: string;
-  memberType: string; // Broker | Insurer | ServiceProvider
+  memberType: string; // API returns e.g. "Broker" | "Insurer" | "Service Provider" (spaced)
   supportedProcesses?: { processName: string; processVersion?: string }[];
 };
 
-export async function fetchReceivers(opts: { environment: string; pfxBase64: string; password: string; license: string }): Promise<{ result: HttpResult; data: Receiver[] | null }> {
+/** Map a receiver's memberType (any casing/spacing) to SenderReceiverType.json's category enum: broker | insurer | serviceprovider. */
+export function toCategoryEnum(memberType: string): string {
+  return memberType.toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+export async function fetchReceivers(opts: { environment: string; pfxBase64: string; password: string; license: string }): Promise<{ result: HttpResult; data: Receiver[] | null; url: string; method: string; requestBody: string }> {
   const base = ENV_URLS[opts.environment];
   const url = `${base}/general/v3/saf-receivers`;
   const body = JSON.stringify({
@@ -201,7 +206,7 @@ export async function fetchReceivers(opts: { environment: string; pfxBase64: str
   const result = await mtls(url, "POST", body, opts.pfxBase64, opts.password);
   let data: Receiver[] | null = null;
   if (result.ok) { try { data = JSON.parse(result.body) as Receiver[]; } catch { /* */ } }
-  return { result, data };
+  return { result, data, url, method: "POST", requestBody: body };
 }
 
 // ---- Public Key Store: fetch a member's keys (to encrypt to a receiver) ----
@@ -214,13 +219,13 @@ export type PublicKeyInfo = {
   ecoHubStatus: string;       // Activated | …
 };
 
-export async function fetchMemberKeys(opts: { environment: string; pfxBase64: string; password: string; idp: string }): Promise<{ result: HttpResult; data: PublicKeyInfo[] | null }> {
+export async function fetchMemberKeys(opts: { environment: string; pfxBase64: string; password: string; idp: string }): Promise<{ result: HttpResult; data: PublicKeyInfo[] | null; url: string; method: string }> {
   const base = ENV_URLS[opts.environment];
-  const url = `${base}/publickeystore/v2/members/${opts.idp}/keys`;
+  const url = `${base}/publickeystore/v3/members/${opts.idp}/keys`;
   const result = await mtls(url, "GET", null, opts.pfxBase64, opts.password);
   let data: PublicKeyInfo[] | null = null;
   if (result.ok) { try { data = JSON.parse(result.body) as PublicKeyInfo[]; } catch { /* */ } }
-  return { result, data };
+  return { result, data, url, method: "GET" };
 }
 
 // Pick the activated encryption key that supports the given process.
@@ -232,8 +237,22 @@ export function pickEncryptionKey(keys: PublicKeyInfo[], processName: string): P
 }
 
 export type KeyKind = "encryption" | "signature";
-export type Step = { name: string; status: number; ok: boolean };
-export type PksResult = { ok: boolean; keyId?: string; version: string; steps: Step[]; detailBody: string };
+export type Step = { name: string; status: number; ok: boolean; method: "GET" | "POST"; url: string; body: string | null };
+export type PksResult = { ok: boolean; keyId?: string; version: string; steps: Step[]; detailBody: string; curl: string };
+
+/** Render a step as a runnable curl command (mTLS via the tech-user PFX). */
+export function stepToCurl(step: Step, password: string): string {
+  const parts = [
+    `curl -X ${step.method} "${step.url}"`,
+    `--cert-type P12 --cert "client.pfx:${password}"`,
+    `-H "Accept: application/json"`,
+  ];
+  if (step.body) {
+    parts.push(`-H "Content-Type: application/json"`);
+    parts.push(`-d '${step.body.replace(/'/g, `'\\''`)}'`);
+  }
+  return parts.join(" \\\n  ") + "\n\n# client.pfx is the enrolled tech-user certificate for this profile (PKCS#12).";
+}
 
 // Upload a public key, prove possession of the private key, then activate it.
 export async function uploadAndActivateKey(opts: {
@@ -246,15 +265,17 @@ export async function uploadAndActivateKey(opts: {
   kind: KeyKind;
 }): Promise<PksResult> {
   const base = ENV_URLS[opts.environment];
-  const keysUrl = `${base}/publickeystore/v2/keys`;
+  const keysUrl = `${base}/publickeystore/v3/keys`;
   const steps: Step[] = [];
   const version = opts.version;
   let keyId: string | undefined;
+  const curlFor = (s: Step) => stepToCurl(s, opts.password);
 
   // 1. upload (body is a JSON array) — single attempt with the chosen version
   const body = JSON.stringify([{ version, key: opts.publicPem, expireInDays: 365, keyType: opts.kind }]);
   const r = await mtls(keysUrl, "POST", body, opts.pfxBase64, opts.password);
-  steps.push({ name: `upload v${version}`, status: r.status, ok: r.ok });
+  const uploadStep: Step = { name: `upload v${version}`, status: r.status, ok: r.ok, method: "POST", url: keysUrl, body };
+  steps.push(uploadStep);
   if (!r.ok) {
     let code: string | undefined;
     try { code = JSON.parse(r.body).errorCode; } catch { /* */ }
@@ -262,19 +283,20 @@ export async function uploadAndActivateKey(opts: {
     const msg = exists
       ? `Version ${version} already exists in the ${opts.environment} Public Key Store for this key type. Generate a key with a different version.\n\n${r.body}`
       : r.body;
-    return { ok: false, version, steps, detailBody: msg };
+    return { ok: false, version, steps, detailBody: msg, curl: curlFor(uploadStep) };
   }
   try { keyId = JSON.parse(r.body)[0]?.keyId; } catch { /* */ }
-  if (!keyId) return { ok: false, version, steps, detailBody: `Upload returned HTTP ${r.status} but no keyId.\n\n${r.body}` };
+  if (!keyId) return { ok: false, version, steps, detailBody: `Upload returned HTTP ${r.status} but no keyId.\n\n${r.body}`, curl: curlFor(uploadStep) };
 
-  const verifyUrl = `${base}/publickeystore/v2/keys/${keyId}/verify`;
+  const verifyUrl = `${base}/publickeystore/v3/keys/${keyId}/verify`;
 
   // 2. GET the verification challenge
   const g = await mtls(verifyUrl, "GET", null, opts.pfxBase64, opts.password);
-  steps.push({ name: "get challenge", status: g.status, ok: g.ok });
-  if (!g.ok) return { ok: false, keyId, version, steps, detailBody: g.body };
+  const challengeStep: Step = { name: "get challenge", status: g.status, ok: g.ok, method: "GET", url: verifyUrl, body: null };
+  steps.push(challengeStep);
+  if (!g.ok) return { ok: false, keyId, version, steps, detailBody: g.body, curl: curlFor(challengeStep) };
   let challenge: string;
-  try { challenge = JSON.parse(g.body).verificationContent; } catch { return { ok: false, keyId, version, steps, detailBody: g.body }; }
+  try { challenge = JSON.parse(g.body).verificationContent; } catch { return { ok: false, keyId, version, steps, detailBody: g.body, curl: curlFor(challengeStep) }; }
 
   // 3. prove possession of the private key
   const verifiedContent =
@@ -283,14 +305,18 @@ export async function uploadAndActivateKey(opts: {
       : await crypto.signTextToDerB64(challenge, opts.privatePem);
 
   // 4. POST the proof
-  const p = await mtls(verifyUrl, "POST", JSON.stringify({ keyId, verifiedContent }), opts.pfxBase64, opts.password);
-  steps.push({ name: "verify", status: p.status, ok: p.ok });
-  if (!p.ok) return { ok: false, keyId, version, steps, detailBody: p.body };
+  const verifyBody = JSON.stringify({ keyId, verifiedContent });
+  const p = await mtls(verifyUrl, "POST", verifyBody, opts.pfxBase64, opts.password);
+  const verifyStep: Step = { name: "verify", status: p.status, ok: p.ok, method: "POST", url: verifyUrl, body: verifyBody };
+  steps.push(verifyStep);
+  if (!p.ok) return { ok: false, keyId, version, steps, detailBody: p.body, curl: curlFor(verifyStep) };
 
   // 5. activate
-  const a = await mtls(`${base}/publickeystore/v2/keys/${keyId}/activate`, "POST", null, opts.pfxBase64, opts.password);
-  steps.push({ name: "activate", status: a.status, ok: a.ok });
-  if (!a.ok) return { ok: false, keyId, version, steps, detailBody: a.body };
+  const activateUrl = `${base}/publickeystore/v3/keys/${keyId}/activate`;
+  const a = await mtls(activateUrl, "POST", null, opts.pfxBase64, opts.password);
+  const activateStep: Step = { name: "activate", status: a.status, ok: a.ok, method: "POST", url: activateUrl, body: null };
+  steps.push(activateStep);
+  if (!a.ok) return { ok: false, keyId, version, steps, detailBody: a.body, curl: curlFor(activateStep) };
 
-  return { ok: true, keyId, version, steps, detailBody: a.body || "Key uploaded, verified and activated." };
+  return { ok: true, keyId, version, steps, detailBody: a.body || "Key uploaded, verified and activated.", curl: curlFor(activateStep) };
 }
