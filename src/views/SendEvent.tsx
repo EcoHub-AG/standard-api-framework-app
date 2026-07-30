@@ -205,7 +205,7 @@ export default function SendEvent() {
         licenceKey: active.credentials.license,
         userAgent: { name: "SAF Testing Tool", version: "2.1" },
         eventReceiver: { category: toCategoryEnum(receiver.memberType), id: idp },
-        eventSender: { category: active.role, id: active.credentials.idp },
+        eventSender: { category: active.membershipType, id: active.credentials.idp },
         processName,
         processVersion: eventKind === "data" ? processVersion : PROCESSES["offer.nlpi"].defaultVersion,
         processStatus,

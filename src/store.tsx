@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { Profile, Role } from "./types";
+import type { Profile, MembershipType } from "./types";
 import { load, save } from "./lib/storage";
 
 export type View = "send" | "inbox" | "outbox" | "config";
@@ -11,7 +11,7 @@ function defaultProfile(): Profile {
   return {
     id: "p-" + Math.random().toString(36).slice(2, 9),
     name: "SAF Insurer",
-    role: "insurer",
+    membershipType: "insurer",
     avatar: "SI",
     connected: false,
     credentials: { environment: "IAT", idp: "", license: "", password: "", iak: "", orgId: "" },
@@ -26,15 +26,15 @@ type Store = {
   active: Profile;
   activeId: string;
   switchProfile: (id: string) => void;
-  createProfile: (input: { name: string; role: Role; environment: string }) => string;
+  createProfile: (input: { name: string; membershipType: MembershipType; environment: string }) => string;
   updateActive: (patch: Partial<Profile>) => void;
   updateProfile: (id: string, patch: Partial<Profile>) => void;
   deleteProfile: (id: string) => void;
   // compatibility surface (derived from the active profile)
-  role: Role;
+  membershipType: MembershipType;
   title: string;
   configured: boolean;
-  setRole: (r: Role) => void;
+  setMembershipType: (r: MembershipType) => void;
   setTitle: (t: string) => void;
   setConfigured: (b: boolean) => void;
   view: View;
@@ -76,8 +76,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => save("profiles", profiles), [profiles]);
   useEffect(() => save("activeId", resolvedActiveId), [resolvedActiveId]);
   useEffect(() => {
-    document.body.setAttribute("data-role", active.role);
-  }, [active.role]);
+    document.body.setAttribute("data-membership-type", active.membershipType);
+  }, [active.membershipType]);
 
   function updateProfile(id: string, patch: Partial<Profile>) {
     setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -88,12 +88,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   function switchProfile(id: string) {
     setActiveId(id);
   }
-  function createProfile(input: { name: string; role: Role; environment: string }) {
+  function createProfile(input: { name: string; membershipType: MembershipType; environment: string }) {
     const p: Profile = {
       ...defaultProfile(),
       id: "p-" + Math.random().toString(36).slice(2, 9),
       name: input.name,
-      role: input.role,
+      membershipType: input.membershipType,
       avatar: initials(input.name),
       credentials: { ...defaultProfile().credentials, environment: input.environment },
     };
@@ -105,8 +105,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setProfiles((prev) => (prev.length > 1 ? prev.filter((p) => p.id !== id) : prev));
   }
 
-  function setRole(r: Role) {
-    updateActive({ role: r });
+  function setMembershipType(r: MembershipType) {
+    updateActive({ membershipType: r });
   }
   function setTitle(t: string) {
     const name = t.trim() || active.name;
@@ -133,10 +133,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateActive,
     updateProfile,
     deleteProfile,
-    role: active.role,
+    membershipType: active.membershipType,
     title: active.name,
     configured: active.connected,
-    setRole,
+    setMembershipType,
     setTitle,
     setConfigured,
     view,

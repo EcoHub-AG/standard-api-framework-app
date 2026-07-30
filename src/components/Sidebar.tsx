@@ -4,6 +4,18 @@ import { Send, Inbox as InboxIcon, SendHorizontal, Settings, ChevronsUpDown, Plu
 import { useApp, type View } from "../store";
 import { outboxFor } from "../lib/bus";
 import { inboxFor } from "../lib/inboxStore";
+import type { MembershipType } from "../types";
+
+const MEMBERSHIP_COLOR: Record<MembershipType, string> = {
+  insurer: "#0e7c7b",
+  broker: "#4b45c2",
+  serviceprovider: "#b2620a",
+};
+const MEMBERSHIP_LABEL: Record<MembershipType, string> = {
+  insurer: "Insurer",
+  broker: "Broker",
+  serviceprovider: "Service Provider",
+};
 
 const NAV: { group: string; items: { view: View; label: string; icon: any }[] }[] = [
   {
@@ -79,10 +91,10 @@ export default function Sidebar() {
               <div className="menu-label">Profiles</div>
               {profiles.map((p) => (
                 <button key={p.id} className="menu-item" onClick={() => { switchProfile(p.id); setMenuOpen(false); }}>
-                  <span className="swatch" style={{ background: p.role === "insurer" ? "#0e7c7b" : "#4b45c2" }} />
+                  <span className="swatch" style={{ background: MEMBERSHIP_COLOR[p.membershipType] }} />
                   <span className="mi-main">
                     <span>{p.name}</span>
-                    <span className="mi-sub">{p.role === "insurer" ? "Insurer" : "Broker"} · {p.credentials.environment}{p.connected ? " · connected" : ""}</span>
+                    <span className="mi-sub">{MEMBERSHIP_LABEL[p.membershipType]} · {p.credentials.environment}{p.connected ? " · connected" : ""}</span>
                   </span>
                   {p.id === active.id && <span className="mi-check">✓</span>}
                 </button>

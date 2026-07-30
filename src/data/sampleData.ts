@@ -1,9 +1,10 @@
 // Demo data matching the mockups. In Phase 2 this is replaced by the backend service.
-export type Role = "insurer" | "broker";
+import type { MembershipType } from "../types";
 
-export const ROLES: Record<Role, { title: string; label: string; avatar: string; idp: string; counterparties: string[] }> = {
+export const MEMBERSHIP_TYPES: Record<MembershipType, { title: string; label: string; avatar: string; idp: string; counterparties: string[] }> = {
   insurer: { title: "SAF Insurer", label: "Insurer", avatar: "SI", idp: "10012345", counterparties: ["Helvetia Brokers", "Kessler & Co", "Aon Switzerland"] },
   broker: { title: "SAF Broker", label: "Broker", avatar: "SB", idp: "10067890", counterparties: ["Zürich Insurance", "Baloise", "AXA Switzerland"] },
+  serviceprovider: { title: "SAF Service Provider", label: "Service Provider", avatar: "SP", idp: "10099999", counterparties: ["Helvetia Brokers", "Zürich Insurance"] },
 };
 
 export type InboxItem = {

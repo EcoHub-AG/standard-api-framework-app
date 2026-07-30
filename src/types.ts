@@ -1,6 +1,6 @@
 import type { Envelope } from "./lib/crypto";
 
-export type Role = "insurer" | "broker";
+export type MembershipType = "insurer" | "broker" | "serviceprovider";
 
 export type KeyRecord = {
   version: string;
@@ -33,7 +33,7 @@ export type TechUser = {
 export type Profile = {
   id: string;
   name: string;
-  role: Role;
+  membershipType: MembershipType;
   avatar: string;
   connected: boolean;
   credentials: Credentials;

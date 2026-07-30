@@ -2,25 +2,30 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { UserPlus } from "lucide-react";
 import { useApp } from "../store";
-import type { Role } from "../types";
+import type { MembershipType } from "../types";
 
 const ENVIRONMENTS = ["Production", "IAT", "Staging", "Test", "Development"];
+const DEFAULT_NAMES: Record<MembershipType, string> = {
+  insurer: "New Insurer",
+  broker: "New Broker",
+  serviceprovider: "New Service Provider",
+};
 
 export default function NewProfileSheet() {
   const { newProfileOpen, setNewProfileOpen, createProfile, setView, toast } = useApp();
   const [name, setName] = useState("");
-  const [role, setRole] = useState<Role>("insurer");
+  const [membershipType, setMembershipType] = useState<MembershipType>("insurer");
   const [environment, setEnvironment] = useState("IAT");
 
   function close() {
     setNewProfileOpen(false);
     setName("");
-    setRole("insurer");
+    setMembershipType("insurer");
     setEnvironment("IAT");
   }
   function create() {
-    const finalName = name.trim() || (role === "insurer" ? "New Insurer" : "New Broker");
-    createProfile({ name: finalName, role, environment });
+    const finalName = name.trim() || DEFAULT_NAMES[membershipType];
+    createProfile({ name: finalName, membershipType, environment });
     toast(`Profile "${finalName}" created`);
     close();
     setView("config");
@@ -54,11 +59,12 @@ export default function NewProfileSheet() {
               </div>
               <div className="frow two">
                 <div>
-                  <label className="fl">Role</label>
+                  <label className="fl">Membership type</label>
                   <div className="selectw">
-                    <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+                    <select value={membershipType} onChange={(e) => setMembershipType(e.target.value as MembershipType)}>
                       <option value="insurer">Insurer</option>
                       <option value="broker">Broker</option>
+                      <option value="serviceprovider">Service Provider</option>
                     </select>
                   </div>
                 </div>

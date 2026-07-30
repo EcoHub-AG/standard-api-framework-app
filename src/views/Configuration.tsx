@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Wifi, KeyRound, ShieldCheck, Plus, Trash2, Lock, UploadCloud, Loader2, FileUp, Import } from "lucide-react";
 import { useApp } from "../store";
-import type { Credentials, KeyRecord } from "../types";
+import type { Credentials, KeyRecord, MembershipType } from "../types";
 import * as crypto from "../lib/crypto";
 import { enrolTechUser, uploadAndActivateKey } from "../lib/ecohub";
 import DetailModal, { type Detail } from "../components/DetailModal";
@@ -224,6 +224,20 @@ export default function Configuration() {
                       <div className="selectw"><select value={cred.environment} onChange={(e) => set("environment", e.target.value)}>{ENVIRONMENTS.map((e) => <option key={e}>{e}</option>)}</select></div>
                     </div>
                     <div><label className="fl">License key <span className="req">*</span></label><input className="input mono" placeholder="SAF-XXXX-XXXX-XXXX" value={cred.license} onChange={(e) => set("license", e.target.value)} /></div>
+                  </div>
+                  <div className="frow">
+                    <label className="fl">Membership type</label>
+                    <div className="selectw" style={{ maxWidth: 220 }}>
+                      <select
+                        value={active.membershipType}
+                        onChange={(e) => { updateActive({ membershipType: e.target.value as MembershipType }); toast("Membership type updated"); }}
+                      >
+                        <option value="insurer">Insurer</option>
+                        <option value="broker">Broker</option>
+                        <option value="serviceprovider">Service Provider</option>
+                      </select>
+                    </div>
+                    <div className="hint">Used as this profile's sender category on outgoing events. Rarely needs changing.</div>
                   </div>
                   <div className="hint">CSM &amp; Services API URLs are derived from the environment.</div>
                 </div>

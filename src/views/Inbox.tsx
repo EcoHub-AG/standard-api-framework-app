@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store";
 import FormTree from "../components/FormTree";
+import JsonView from "../components/JsonView";
 import { toJSON, copyText } from "../lib/format";
 import { decrypt, verify } from "../lib/crypto";
 import type { Envelope } from "../lib/crypto";
@@ -150,7 +151,14 @@ export default function Inbox() {
     return new Date(ms).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
-  const rawText = decoded ? toJSON(decoded) : "";
+  // Not every SAF event carries an encrypted envelope — error and IDS status
+  // events (among others) publish plaintext data with no payload/encryptionKey/
+  // payloadSignature at all. Detect that up front so we never show a
+  // "Decrypt" affordance for something there's nothing to decrypt.
+  const hasEncrypted = Boolean(
+    sel?.envelope.payload && sel?.envelope.encryptionKey && sel?.envelope.payloadSignature
+  );
+  const rawEventText = sel ? toJSON(sel.rawEvent) : "";
 
   return (
     <div className="view">
@@ -207,12 +215,14 @@ export default function Inbox() {
             </div>
           ) : (
             <div className="detail">
-              <div className="pipeline">
+              <div className={"pipeline" + (hasEncrypted ? "" : " single")}>
                 <div className="pane">
                   <div className="pane-head">
                     <span className="pane-step">1</span>
-                    <div className="pane-titles"><div className="pane-title">Encrypted envelope</div><div className="pane-sub">Received ciphertext</div></div>
-                    <button className="btn-copy" onClick={() => { copyText(toJSON(sel.envelope)); toast("Copied"); }}><Copy size={12} /> Copy</button>
+                    <div className="pane-titles">
+                      <div className="pane-title">Received event</div>
+                      <div className="pane-sub">Full Kafka message value, as received</div>
+                    </div>
                   </div>
                   <div className="pane-body">
                     <div className="enc-meta">
@@ -221,55 +231,68 @@ export default function Inbox() {
                       <span className="k">Topic</span><span className="v">{sel.topic}</span>
                       <span className="k">Partition · offset</span><span className="v">{sel.partition} · {sel.offset}</span>
                       <span className="k">Arrived</span><span className="v">{fmtTime(sel)}</span>
-                      <span className="k">Enc key</span><span className="v">v{sel.envelope.publicKeyVersion}</span>
-                      <span className="k">Sig key</span><span className="v">v{sel.envelope.signatureKeyVersion}</span>
+                      {hasEncrypted && <><span className="k">Enc key</span><span className="v">v{sel.envelope.publicKeyVersion}</span></>}
+                      {hasEncrypted && <><span className="k">Sig key</span><span className="v">v{sel.envelope.signatureKeyVersion}</span></>}
                     </div>
-                    <div className="ciph-head"><span className="lbl">payload (AES-GCM)</span></div>
-                    <pre className="code-block">{sel.envelope.payload}</pre>
-                  </div>
-                </div>
-
-                <div className="connector">
-                  <motion.div className={"op-node" + (decoded ? " done" : "")} animate={decrypting ? { scale: [1, 1.08, 1] } : { scale: 1 }} transition={decrypting ? { repeat: Infinity, duration: 1 } : {}}>
-                    {decoded ? <Check size={21} /> : <KeyRound size={21} strokeWidth={1.8} />}
-                  </motion.div>
-                  <button className="op-btn" disabled={decrypting} onClick={doDecrypt}>
-                    {decrypting ? "Decrypting…" : "Decrypt"} <ArrowRight size={13} />
-                  </button>
-                  <div className="op-label">with your<br />private key</div>
-                </div>
-
-                <div className="pane">
-                  <div className="pane-head">
-                    <span className={"pane-step" + (decoded ? " done" : "")}>2</span>
-                    <div className="pane-titles"><div className="pane-title">Decoded payload</div><div className="pane-sub">Cleartext after decryption</div></div>
-                    <div className="seg" style={{ opacity: decoded ? 1 : 0.4, pointerEvents: decoded ? "auto" : "none" }}>
-                      <button className={viewMode === "form" ? "on" : ""} onClick={() => setViewMode("form")}>Form</button>
-                      <button className={viewMode === "raw" ? "on" : ""} onClick={() => setViewMode("raw")}>Raw</button>
-                    </div>
-                  </div>
-                  <div className="pane-body">
-                    {err ? (
-                      <div className="pane-empty"><ShieldAlert style={{ color: "var(--err)" }} strokeWidth={1.5} /><div className="t">Decrypt failed</div><div className="s">{err}</div></div>
-                    ) : !decoded ? (
-                      <div className="pane-empty"><KeyRound strokeWidth={1.5} /><div className="t">Encrypted</div><div className="s">Decrypt with your private key to reveal the payload and verify the sender's signature.</div></div>
-                    ) : viewMode === "form" ? <FormTree values={decoded} readOnly /> : <pre className="code-block">{rawText}</pre>}
-                  </div>
-                  {decoded && (
-                    <div className="pane-foot">
-                      <span className="st">
-                        {verified === true
-                          ? <span className="chip chip-ok"><ShieldCheck size={10} /> Signature verified</span>
-                          : verified === false
-                          ? <span className="chip chip-warn"><ShieldAlert size={10} /> Signature NOT verified</span>
-                          : null}
+                    <div className="ciph-head">
+                      <span className="lbl">event JSON</span>
+                      <span className="ciph-head-right">
+                        {!hasEncrypted && <span className="chip chip-pending">no encrypted payload</span>}
+                        <button className="btn-copy" onClick={() => { copyText(rawEventText); toast("Copied"); }}><Copy size={12} /> Copy</button>
                       </span>
-                      <button className="btn-primary" disabled={acked} onClick={() => { setAcked(true); toast("Acknowledged"); }}>
-                        <CheckCheck size={14} /> {acked ? "Acknowledged" : "Acknowledge"}
-                      </button>
                     </div>
-                  )}
+                    <JsonView data={sel.rawEvent} className="code-block-bounded" />
+                  </div>
                 </div>
+
+                {hasEncrypted && (
+                  <>
+                    <div className="connector">
+                      <motion.div className={"op-node" + (decoded ? " done" : "")} animate={decrypting ? { scale: [1, 1.08, 1] } : { scale: 1 }} transition={decrypting ? { repeat: Infinity, duration: 1 } : {}}>
+                        {decoded ? <Check size={21} /> : <KeyRound size={21} strokeWidth={1.8} />}
+                      </motion.div>
+                      <button className="op-btn" disabled={decrypting} onClick={doDecrypt}>
+                        {decrypting ? "Decrypting…" : "Decrypt"} <ArrowRight size={13} />
+                      </button>
+                      <div className="op-label">with your<br />private key</div>
+                    </div>
+
+                    <div className="pane">
+                      <div className="pane-head">
+                        <span className={"pane-step" + (decoded ? " done" : "")}>2</span>
+                        <div className="pane-titles"><div className="pane-title">Decoded payload</div><div className="pane-sub">Cleartext after decryption</div></div>
+                        {decoded && viewMode === "raw" && (
+                          <button className="btn-copy" onClick={() => { copyText(toJSON(decoded)); toast("Copied"); }}><Copy size={12} /> Copy</button>
+                        )}
+                        <div className="seg" style={{ opacity: decoded ? 1 : 0.4, pointerEvents: decoded ? "auto" : "none" }}>
+                          <button className={viewMode === "form" ? "on" : ""} onClick={() => setViewMode("form")}>Form</button>
+                          <button className={viewMode === "raw" ? "on" : ""} onClick={() => setViewMode("raw")}>Raw</button>
+                        </div>
+                      </div>
+                      <div className="pane-body">
+                        {err ? (
+                          <div className="pane-empty"><ShieldAlert style={{ color: "var(--err)" }} strokeWidth={1.5} /><div className="t">Decrypt failed</div><div className="s">{err}</div></div>
+                        ) : !decoded ? (
+                          <div className="pane-empty"><KeyRound strokeWidth={1.5} /><div className="t">Encrypted</div><div className="s">Decrypt with your private key to reveal the payload and verify the sender's signature.</div></div>
+                        ) : viewMode === "form" ? <FormTree values={decoded} readOnly /> : <JsonView data={decoded} className="code-block-bounded" />}
+                      </div>
+                      {decoded && (
+                        <div className="pane-foot">
+                          <span className="st">
+                            {verified === true
+                              ? <span className="chip chip-ok"><ShieldCheck size={10} /> Signature verified</span>
+                              : verified === false
+                              ? <span className="chip chip-warn"><ShieldAlert size={10} /> Signature NOT verified</span>
+                              : null}
+                          </span>
+                          <button className="btn-primary" disabled={acked} onClick={() => { setAcked(true); toast("Acknowledged"); }}>
+                            <CheckCheck size={14} /> {acked ? "Acknowledged" : "Acknowledge"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}
