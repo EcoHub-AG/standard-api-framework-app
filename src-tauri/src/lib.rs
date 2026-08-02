@@ -434,6 +434,8 @@ pub fn run() {
     tauri::Builder::default()
         .manage(ConsumerState(Mutex::new(Arc::new(AtomicBool::new(false)))))
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             http_post_json, mtls_request, vault_load, vault_save,
             kafka_produce, schema_registry_get_ids,

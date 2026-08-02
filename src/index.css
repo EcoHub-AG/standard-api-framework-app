@@ -104,6 +104,12 @@ button{font-family:inherit}
 .banner{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:.5px solid var(--line);font-size:12.5px}
 .banner.warn{background:var(--warn-tint);color:#7a4406}
 .banner.ok{background:var(--ok-tint);color:#146030}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin 1s linear infinite}
+.banner.info{background:var(--accent-tint);color:var(--accent-ink)}
+.banner.info .banner-act{background:var(--accent)}
+.banner.info .banner-act:hover{background:var(--accent-strong)}
+.banner.info .banner-act:disabled{opacity:.6;cursor:default}
 .banner-icon{width:18px;height:18px;flex:none;display:grid;place-items:center}.banner-icon svg{width:18px;height:18px}
 .banner-text{flex:1;line-height:1.35}.banner-text b{font-weight:650}
 .banner-act{border:0;cursor:pointer;font-size:12px;font-weight:600;padding:5px 12px;border-radius:7px;background:var(--warn);color:#fff}

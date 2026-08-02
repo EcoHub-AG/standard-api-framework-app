@@ -28,9 +28,18 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "windows": {
       "signCommand": "cmd /C ../scripts/sign.cmd %1"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkzMDQ4NDMwNjJFQjY2RTIKUldUaVp1dGlNSVFFazRWdDNiajJqbU9zcGhWMDJ5Tlh6a3M2MS9QY1JzaW93VWN6cGptdlFScW0K",
+      "endpoints": [
+        "https://github.com/mirsabbir/standard-api-framework-app/releases/latest/download/latest.json"
+      ]
     }
   }
 }

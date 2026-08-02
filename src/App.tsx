@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import Banner from "./components/Banner";
+import UpdateBanner from "./components/UpdateBanner";
 import NewProfileSheet from "./components/NewProfileSheet";
 import SendEvent from "./views/SendEvent";
 import Inbox from "./views/Inbox";
@@ -29,6 +30,7 @@ export default function App() {
     <div className="window">
       <Sidebar />
       <main className="main">
+        <UpdateBanner />
         <Banner />
         <AnimatePresence mode="wait">
           <motion.div

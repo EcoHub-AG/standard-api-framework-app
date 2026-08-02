@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Inbox as InboxIcon, SendHorizontal, Settings, ChevronsUpDown, Plus } from "lucide-react";
+import { Send, Inbox as InboxIcon, SendHorizontal, Settings, ChevronsUpDown, Plus, RefreshCw } from "lucide-react";
 import { useApp, type View } from "../store";
 import { outboxFor } from "../lib/bus";
 import { inboxFor } from "../lib/inboxStore";
+import { checkForUpdate, useUpdater } from "../lib/updater";
 import type { MembershipType } from "../types";
+
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 const MEMBERSHIP_COLOR: Record<MembershipType, string> = {
   insurer: "#0e7c7b",
@@ -30,8 +33,15 @@ const NAV: { group: string; items: { view: View; label: string; icon: any }[] }[
 ];
 
 export default function Sidebar() {
-  const { view, setView, active, profiles, switchProfile, configured, setNewProfileOpen, busTick, sessionInboxIds } = useApp();
+  const { view, setView, active, profiles, switchProfile, configured, setNewProfileOpen, busTick, sessionInboxIds, toast } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { checking } = useUpdater();
+
+  async function handleCheckForUpdate() {
+    setMenuOpen(false);
+    const found = await checkForUpdate();
+    if (!found) toast("You're on the latest version.");
+  }
 
   useEffect(() => {
     const close = () => setMenuOpen(false);
@@ -106,6 +116,19 @@ export default function Sidebar() {
                 </span>
                 <span className="mi-main"><span>New profile…</span><span className="mi-sub">Add another identity</span></span>
               </button>
+              {isTauri && (
+                <>
+                  <div className="menu-sep" />
+                  <button className="menu-item" disabled={checking} onClick={handleCheckForUpdate}>
+                    <span className="swatch" style={{ background: "var(--ink-3)", display: "grid", placeItems: "center" }}>
+                      <RefreshCw size={9} color="#fff" className={checking ? "spin" : undefined} />
+                    </span>
+                    <span className="mi-main">
+                      <span>{checking ? "Checking…" : "Check for updates…"}</span>
+                    </span>
+                  </button>
+                </>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
