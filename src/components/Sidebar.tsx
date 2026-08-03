@@ -33,13 +33,13 @@ const NAV: { group: string; items: { view: View; label: string; icon: any }[] }[
 ];
 
 export default function Sidebar() {
-  const { view, setView, active, profiles, switchProfile, deleteProfile, configured, setNewProfileOpen, busTick, sessionInboxIds, toast } = useApp();
+  const { view, setView, active, profiles, switchProfile, deleteProfile, configured, setNewProfileOpen, busTick, sessionInboxIds, toast, askConfirm } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const { checking } = useUpdater();
 
-  function handleDeleteProfile(e: MouseEvent, p: (typeof profiles)[number]) {
+  async function handleDeleteProfile(e: MouseEvent, p: (typeof profiles)[number]) {
     e.stopPropagation();
-    if (!confirm(`Delete profile "${p.name}"? This removes its keys.`)) return;
+    if (!(await askConfirm(`Delete profile "${p.name}"? This removes its keys.`))) return;
     deleteProfile(p.id);
     toast("Profile deleted");
   }

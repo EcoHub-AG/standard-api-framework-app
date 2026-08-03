@@ -11,7 +11,7 @@ const nextVersion = (rows: KeyRecord[]) =>
   rows.length ? `${Math.max(...rows.map((r) => parseInt(r.version) || 0)) + 1}.0.0` : "1.0.0";
 
 export default function Configuration() {
-  const { active, updateActive, configured, setConfigured, toast, deleteProfile, profiles } = useApp();
+  const { active, updateActive, configured, setConfigured, toast, deleteProfile, profiles, askConfirm } = useApp();
   const [section, setSection] = useState<"connection" | "keys">("connection");
   const [cred, setCred] = useState<Credentials>(active.credentials);
   const [status, setStatus] = useState<string | null>(null);
@@ -262,7 +262,7 @@ export default function Configuration() {
                 <span className={"foot-status" + (status?.startsWith("✓") ? " saved" : "")}>{status ?? <>Fields marked <span className="req">*</span> are required to connect.</>}</span>
                 {profiles.length > 1 && (
                   <button className="btn-ghost" style={{ color: "var(--err)", borderColor: "var(--err-tint)" }}
-                    onClick={() => { if (confirm(`Delete profile "${active.name}"? This removes its keys.`)) { deleteProfile(active.id); toast("Profile deleted"); } }}>
+                    onClick={async () => { if (await askConfirm(`Delete profile "${active.name}"? This removes its keys.`)) { deleteProfile(active.id); toast("Profile deleted"); } }}>
                     <Trash2 size={12} style={{ verticalAlign: "-2px" }} /> Delete
                   </button>
                 )}

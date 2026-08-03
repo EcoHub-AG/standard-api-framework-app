@@ -5,6 +5,7 @@ import Sidebar from "./components/Sidebar";
 import Banner from "./components/Banner";
 import UpdateBanner from "./components/UpdateBanner";
 import NewProfileSheet from "./components/NewProfileSheet";
+import ConfirmSheet from "./components/ConfirmSheet";
 import SendEvent from "./views/SendEvent";
 import Inbox from "./views/Inbox";
 import Outbox from "./views/Outbox";
@@ -50,6 +51,7 @@ export default function App() {
       </main>
 
       <NewProfileSheet />
+      <ConfirmSheet />
 
       <AnimatePresence>
         {toastMsg && (

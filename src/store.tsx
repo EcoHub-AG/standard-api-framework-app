@@ -45,6 +45,11 @@ type Store = {
   bumpBus: () => void;
   newProfileOpen: boolean;
   setNewProfileOpen: (b: boolean) => void;
+  // in-app replacement for window.confirm(), which Tauri's native webview
+  // does not reliably support
+  confirmRequest: { message: string } | null;
+  askConfirm: (message: string) => Promise<boolean>;
+  resolveConfirm: (ok: boolean) => void;
   // ids of inbox messages received live during THIS app session (never persisted —
   // resets on restart), used to badge "new" vs. history loaded from the vault.
   sessionInboxIds: Set<string>;
@@ -64,6 +69,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [busTick, setBusTick] = useState(0);
   const [newProfileOpen, setNewProfileOpen] = useState(false);
   const [sessionInboxIds, setSessionInboxIds] = useState<Set<string>>(new Set());
+  const [confirmRequest, setConfirmRequest] = useState<{ message: string } | null>(null);
+  const [confirmResolver, setConfirmResolver] = useState<((ok: boolean) => void) | null>(null);
 
   // ensure activeId points at an existing profile
   const resolvedActiveId = useMemo(
@@ -123,6 +130,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   function markReceivedThisSession(id: string) {
     setSessionInboxIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
   }
+  function askConfirm(message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      setConfirmRequest({ message });
+      setConfirmResolver(() => resolve);
+    });
+  }
+  function resolveConfirm(ok: boolean) {
+    confirmResolver?.(ok);
+    setConfirmRequest(null);
+    setConfirmResolver(null);
+  }
 
   const value: Store = {
     profiles,
@@ -149,6 +167,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setNewProfileOpen,
     sessionInboxIds,
     markReceivedThisSession,
+    confirmRequest,
+    askConfirm,
+    resolveConfirm,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
