@@ -69,9 +69,14 @@ button{font-family:inherit}
 .menu-label{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--ink-3);padding:8px 10px 4px}
 .menu-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;padding:8px 10px;border-radius:7px;font-size:13px;color:var(--ink)}
 .menu-item:hover{background:var(--accent);color:#fff}.menu-item:hover .mi-sub{color:rgba(255,255,255,.8)}
-.mi-main{display:flex;flex-direction:column;gap:1px;flex:1}.mi-sub{font-size:11px;color:var(--ink-3)}
+.mi-row{all:unset;display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer}
+.mi-main{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0}.mi-sub{font-size:11px;color:var(--ink-3)}
 .swatch{width:12px;height:12px;border-radius:4px;flex:none}.sw-ins{background:#0e7c7b}.sw-bro{background:#4b45c2}
 .mi-check{color:var(--accent);font-weight:700}.menu-item:hover .mi-check{color:#fff}
+.mi-del{border:0;background:transparent;cursor:pointer;padding:4px;border-radius:5px;flex:none;color:var(--ink-3);display:grid;place-items:center}
+.mi-del:hover{background:rgba(0,0,0,.12);color:var(--err)}
+.menu-item:hover .mi-del{color:rgba(255,255,255,.8)}
+.menu-item:hover .mi-del:hover{background:rgba(255,255,255,.2);color:#fff}
 .menu-sep{height:.5px;background:var(--line);margin:6px 8px}
 
 /* ---------- sidebar ---------- */

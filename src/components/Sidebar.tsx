@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Inbox as InboxIcon, SendHorizontal, Settings, ChevronsUpDown, Plus, RefreshCw } from "lucide-react";
+import { Send, Inbox as InboxIcon, SendHorizontal, Settings, ChevronsUpDown, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useApp, type View } from "../store";
 import { outboxFor } from "../lib/bus";
 import { inboxFor } from "../lib/inboxStore";
@@ -33,9 +33,16 @@ const NAV: { group: string; items: { view: View; label: string; icon: any }[] }[
 ];
 
 export default function Sidebar() {
-  const { view, setView, active, profiles, switchProfile, configured, setNewProfileOpen, busTick, sessionInboxIds, toast } = useApp();
+  const { view, setView, active, profiles, switchProfile, deleteProfile, configured, setNewProfileOpen, busTick, sessionInboxIds, toast } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const { checking } = useUpdater();
+
+  function handleDeleteProfile(e: MouseEvent, p: (typeof profiles)[number]) {
+    e.stopPropagation();
+    if (!confirm(`Delete profile "${p.name}"? This removes its keys.`)) return;
+    deleteProfile(p.id);
+    toast("Profile deleted");
+  }
 
   async function handleCheckForUpdate() {
     setMenuOpen(false);
@@ -101,14 +108,21 @@ export default function Sidebar() {
             >
               <div className="menu-label">Profiles</div>
               {profiles.map((p) => (
-                <button key={p.id} className="menu-item" onClick={() => { switchProfile(p.id); setMenuOpen(false); }}>
-                  <span className="swatch" style={{ background: MEMBERSHIP_COLOR[p.membershipType] }} />
-                  <span className="mi-main">
-                    <span>{p.name}</span>
-                    <span className="mi-sub">{MEMBERSHIP_LABEL[p.membershipType]} · {p.credentials.environment}{p.connected ? " · connected" : ""}</span>
-                  </span>
-                  {p.id === active.id && <span className="mi-check">✓</span>}
-                </button>
+                <div key={p.id} className="menu-item">
+                  <button className="mi-row" onClick={() => { switchProfile(p.id); setMenuOpen(false); }}>
+                    <span className="swatch" style={{ background: MEMBERSHIP_COLOR[p.membershipType] }} />
+                    <span className="mi-main">
+                      <span>{p.name}</span>
+                      <span className="mi-sub">{MEMBERSHIP_LABEL[p.membershipType]} · {p.credentials.environment}{p.connected ? " · connected" : ""}</span>
+                    </span>
+                    {p.id === active.id && <span className="mi-check">✓</span>}
+                  </button>
+                  {profiles.length > 1 && (
+                    <button className="mi-del" title={`Delete "${p.name}"`} onClick={(e) => handleDeleteProfile(e, p)}>
+                      <Trash2 size={12} />
+                    </button>
+                  )}
+                </div>
               ))}
               <div className="menu-sep" />
               <button className="menu-item" onClick={() => { setMenuOpen(false); setNewProfileOpen(true); }}>
