@@ -1,6 +1,6 @@
 # Publishing an Update
 
-The app checks `https://github.com/mirsabbir/standard-api-framework-app/releases/latest/download/latest.json`
+The app checks `https://github.com/EcoHub-AG/standard-api-framework-app/releases/latest/download/latest.json`
 on startup (`src/components/UpdateBanner.tsx`) and, if it lists a newer
 version, offers an in-app "Update & Restart" button. This is powered by
 Tauri's `updater` plugin (`src-tauri/tauri.conf.json` → `plugins.updater`).
@@ -20,12 +20,16 @@ Tauri's `updater` plugin (`src-tauri/tauri.conf.json` → `plugins.updater`).
 2. Before building, point the build at the private signing key so Tauri
    signs the update artifacts:
 
+   The CLI expects this env var to be the **base64-encoded** key file
+   content (not the raw minisign text) — it base64-decodes it internally
+   before parsing.
+
    ```powershell
-   $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw src-tauri\updater.key
+   $env:TAURI_SIGNING_PRIVATE_KEY = [Convert]::ToBase64String([IO.File]::ReadAllBytes("src-tauri\updater.key"))
    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
    ```
 
-   (bash equivalent: `export TAURI_SIGNING_PRIVATE_KEY=$(cat src-tauri/updater.key)`)
+   (bash equivalent: `export TAURI_SIGNING_PRIVATE_KEY=$(base64 -i src-tauri/updater.key)`)
 
 3. Run the existing platform build script as usual
    (`scripts\build-and-sign-windows.cmd` / `scripts/build-and-sign-macos.command`).

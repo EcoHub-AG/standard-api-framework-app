@@ -81,15 +81,19 @@ The private key signs the update artifacts so the in-app updater can trust
 them. It's git-ignored — you must have your own copy (see
 [`RELEASING.md`](./RELEASING.md) for where it lives / how to recover it).
 
+The CLI expects this env var to be the **base64-encoded** key file content
+(not the raw minisign text) — it base64-decodes it internally before
+parsing.
+
 PowerShell (Windows):
 ```powershell
-$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw src-tauri\updater.key
+$env:TAURI_SIGNING_PRIVATE_KEY = [Convert]::ToBase64String([IO.File]::ReadAllBytes("src-tauri\updater.key"))
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
 ```
 
 bash (macOS):
 ```bash
-export TAURI_SIGNING_PRIVATE_KEY=$(cat src-tauri/updater.key)
+export TAURI_SIGNING_PRIVATE_KEY=$(base64 -i src-tauri/updater.key)
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 ```
 

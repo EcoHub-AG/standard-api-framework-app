@@ -39,8 +39,9 @@ export default function Sidebar() {
 
   async function handleCheckForUpdate() {
     setMenuOpen(false);
-    const found = await checkForUpdate();
-    if (!found) toast("You're on the latest version.");
+    const result = await checkForUpdate();
+    if (result === "up-to-date") toast("You're on the latest version.");
+    else if (result === "error") toast("Couldn't check for updates. Check your connection and try again.");
   }
 
   useEffect(() => {
