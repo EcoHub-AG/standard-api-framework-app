@@ -55,6 +55,28 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Install AzureSignTool
+        if: matrix.platform == 'windows-latest'
+        run: |
+          if (-not (Get-Command azuresigntool -ErrorAction SilentlyContinue)) {
+            dotnet tool install --global AzureSignTool
+          }
+
+      - name: Fetch Key Vault access token
+        if: matrix.platform == 'windows-latest'
+        # scripts/sign.cmd (invoked by tauri.conf.json's windows.signCommand)
+        # reads these from the environment — normally set by the interactive
+        # scripts/build-and-sign-windows.cmd wrapper, which CI bypasses by
+        # calling tauri build directly. KEYVAULT_URL/CERT_NAME/TIMESTAMP_URL
+        # mirror that script's hardcoded values; AZURE_ACCESS_TOKEN is a
+        # short-lived token for the service principal from "Azure login" above.
+        run: |
+          $token = az account get-access-token --resource https://vault.azure.net --query accessToken -o tsv
+          echo "AZURE_ACCESS_TOKEN=$token" >> $env:GITHUB_ENV
+          echo "KEYVAULT_URL=https://ecohub-cert-premium-kv.vault.azure.net/" >> $env:GITHUB_ENV
+          echo "CERT_NAME=EcoHub-Code-Signing-CSR" >> $env:GITHUB_ENV
+          echo "TIMESTAMP_URL=http://rfc3161timestamp.globalsign.com/advanced" >> $env:GITHUB_ENV
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
