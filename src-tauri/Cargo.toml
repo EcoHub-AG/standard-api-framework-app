@@ -25,4 +25,4 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
 aes-gcm = "0.10"
 rand = "0.8"
-rdkafka = { version = "0.36", features = ["cmake-build", "ssl-vendored"] }
+rdkafka = { version = "=0.37.0", features = ["cmake-build", "ssl-vendored"] }
