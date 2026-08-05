@@ -91,4 +91,11 @@ jobs:
           releaseName: "Standard API Framework ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
+          # When both MSI and NSIS bundles exist, tauri-action defaults to
+          # MSI as the primary windows-x86_64 updater entry. MSI installs
+          # machine-wide (Program Files) and its silent self-update needs
+          # admin elevation that the in-app updater doesn't have, so it
+          # fails silently. NSIS installs per-user and updates without
+          # elevation — the entry Tauri's own docs recommend for updater use.
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}

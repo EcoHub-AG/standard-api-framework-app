@@ -115,6 +115,10 @@ button{font-family:inherit}
 .banner.info .banner-act{background:var(--accent)}
 .banner.info .banner-act:hover{background:var(--accent-strong)}
 .banner.info .banner-act:disabled{opacity:.6;cursor:default}
+.banner.error{background:var(--err-tint);color:var(--err)}
+.banner.error .banner-act{background:var(--err)}
+.banner.error .banner-act:hover{background:#b32029}
+.banner.error .banner-act:disabled{opacity:.6;cursor:default}
 .banner-icon{width:18px;height:18px;flex:none;display:grid;place-items:center}.banner-icon svg{width:18px;height:18px}
 .banner-text{flex:1;line-height:1.35}.banner-text b{font-weight:650}
 .banner-act{border:0;cursor:pointer;font-size:12px;font-weight:600;padding:5px 12px;border-radius:7px;background:var(--warn);color:#fff}

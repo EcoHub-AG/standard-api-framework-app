@@ -8,11 +8,12 @@ type State = {
   update: UpdateHandle | null;
   checking: boolean;
   installing: boolean;
+  installError: string | null;
 };
 
 export type UpdateCheckResult = "update-found" | "up-to-date" | "error";
 
-let state: State = { update: null, checking: false, installing: false };
+let state: State = { update: null, checking: false, installing: false, installError: null };
 const listeners = new Set<() => void>();
 
 function setState(patch: Partial<State>) {
@@ -37,18 +38,20 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
 
 export async function installUpdate(): Promise<void> {
   if (!state.update) return;
-  setState({ installing: true });
+  setState({ installing: true, installError: null });
   try {
     await state.update.downloadAndInstall();
     const { relaunch } = await import("@tauri-apps/plugin-process");
     await relaunch();
-  } catch {
-    setState({ installing: false });
+  } catch (err) {
+    console.error("Update install failed:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    setState({ installing: false, installError: message });
   }
 }
 
 export function dismissUpdate() {
-  setState({ update: null });
+  setState({ update: null, installError: null });
 }
 
 export function useUpdater() {
