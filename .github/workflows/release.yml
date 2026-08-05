@@ -1,0 +1,68 @@
+name: Release
+
+# Builds and publishes signed macOS + Windows installers whenever a
+# vX.Y.Z tag is pushed (must match the "version" in package.json and
+# src-tauri/tauri.conf.json — see docs/RELEASE_GUIDE.md).
+#
+# macOS job produces a universal (Intel + Apple Silicon) build but is
+# NOT codesigned or notarized (no Apple Developer account wired in) —
+# users installing the .dmg/.app will see a Gatekeeper "unidentified
+# developer" warning and need to right-click → Open the first time.
+# Windows job codesigns via the Azure Key Vault certificate
+# (scripts/sign.cmd), same as the manual build script. Both jobs publish
+# to the SAME GitHub Release; tauri-action merges each platform's
+# latest.json into one manifest automatically, so the manual "merge
+# latest.json by hand" step in RELEASING.md is no longer needed for
+# CI-driven releases.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Azure login (Windows code signing)
+        if: matrix.platform == 'windows-latest'
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Standard API Framework ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

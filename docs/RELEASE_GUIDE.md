@@ -1,5 +1,12 @@
 # Release Guide — Windows & macOS
 
+> **This manual, two-machine process has been superseded by
+> [`CI_RELEASE_GUIDE.md`](./CI_RELEASE_GUIDE.md)**, which uses the
+> `release.yml` GitHub Actions workflow to build and publish both
+> platforms automatically from a tag push. Read this document for how
+> the underlying signing credentials work and how to obtain them —
+> use `CI_RELEASE_GUIDE.md` for the actual release steps.
+
 This is the top-level checklist for shipping a new version. It ties together
 the three docs that already exist in this folder:
 
