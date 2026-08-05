@@ -60,6 +60,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # librdkafka 2.3.0's vendored CMakeLists.txt requires CMake < 3.5
+          # syntax, which CMake >= 4.0 on these runners refuses to configure
+          # without this escape hatch. See ci.yml for the full explanation.
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Standard API Framework ${{ github.ref_name }}"
