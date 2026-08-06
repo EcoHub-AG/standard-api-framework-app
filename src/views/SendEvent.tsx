@@ -15,6 +15,8 @@ import { loadLegacyForm } from "../lib/schema/xsdParser";
 import { buildEnvelopeSkeleton, envelopeSchemaUrl } from "../lib/schema/envelope";
 import { validateAgainstSchema } from "../lib/schema/ajv";
 
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+
 export default function SendEvent() {
   const { active, configured, setView, toast, bumpBus } = useApp();
   const pfx = active.techUser?.techUserCert;
@@ -134,6 +136,10 @@ export default function SendEvent() {
 
   async function onUploadFile(f: File | undefined) {
     if (!f) return;
+    if (f.size > MAX_UPLOAD_BYTES) {
+      toast(`${f.name} is ${(f.size / (1024 * 1024)).toFixed(1)}MB — max upload size is 8MB`);
+      return;
+    }
     try {
       const [bytes, b64] = await Promise.all([fileToBytes(f), fileToBase64(f)]);
       setUploadedFileBytes(bytes);
