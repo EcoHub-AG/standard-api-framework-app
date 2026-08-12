@@ -301,6 +301,7 @@ async fn kafka_produce(
         .set("ssl.keystore.location", pfx_path.to_string_lossy().to_string())
         .set("ssl.keystore.password", &password)
         .set("message.timeout.ms", "20000")
+        .set("message.max.bytes", "8388608")
         .create()
         .map_err(|e| e.to_string())?;
 
@@ -376,6 +377,7 @@ fn kafka_start_consumer(
             .set("ssl.keystore.password", &password)
             .set("auto.offset.reset", "earliest")
             .set("enable.auto.commit", "true")
+            .set("fetch.message.max.bytes", "8388608")
             .create()
         {
             Ok(c) => c,
