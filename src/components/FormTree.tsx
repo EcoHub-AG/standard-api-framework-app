@@ -19,11 +19,18 @@ function Leaf({ pathKey, value, path, readOnly, onChange, opts, required }: {
   if (readOnly) {
     field = <div className={"leaf-ro" + (value === "" || value == null ? " empty" : "")}>{String(value ?? "—")}</div>;
   } else if (options) {
-    const list = value !== "" && value != null && !options.includes(value) ? [value, ...options] : options;
+    // Never feed a non-primitive into <option> — an object child throws
+    // "Objects are not valid as a React child" and white-screens the whole view.
+    // (Happens when a choice/enum field is seeded with a nested object, e.g. the
+    // Mandate XSD's <xs:choice> branches.) Coerce everything to strings and only
+    // prepend the current value when it's a real primitive selection.
+    const isPrimitive = typeof value === "string" || typeof value === "number";
+    const current = isPrimitive ? String(value) : "";
+    const list = current !== "" && !options.includes(current) ? [current, ...options] : options;
     field = (
       <div className="selectw">
-        <select value={String(value ?? "")} onChange={(e) => onChange(path, e.target.value)}>
-          {list.map((o) => <option key={o}>{o}</option>)}
+        <select value={current} onChange={(e) => onChange(path, e.target.value)}>
+          {list.map((o) => <option key={String(o)} value={String(o)}>{String(o)}</option>)}
         </select>
       </div>
     );

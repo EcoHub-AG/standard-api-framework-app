@@ -12,6 +12,9 @@ export function getAjv(): Ajv2019 {
   if (ajv) return ajv;
   ajv = new Ajv2019({
     strict: false,
+    // Collect every validation failure, not just the first — the Send-event
+    // envelope panel lists all schema issues at once.
+    allErrors: true,
     loadSchema: async (uri: string) => (await fetchDoc(uri)).json,
   });
   addFormats(ajv);

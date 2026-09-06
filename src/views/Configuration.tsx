@@ -229,9 +229,10 @@ export default function Configuration() {
                     <label className="fl">Membership type</label>
                     <div className="selectw" style={{ maxWidth: 220 }}>
                       <select
-                        value={active.membershipType}
+                        value={active.membershipType || ""}
                         onChange={(e) => { updateActive({ membershipType: e.target.value as MembershipType }); toast("Membership type updated"); }}
                       >
+                        <option value="" disabled>Select membership type…</option>
                         <option value="insurer">Insurer</option>
                         <option value="broker">Broker</option>
                         <option value="serviceprovider">Service Provider</option>

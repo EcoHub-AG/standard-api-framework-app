@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check } from "lucide-react";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar from "./components/Sidebar";
 import Banner from "./components/Banner";
 import UpdateBanner from "./components/UpdateBanner";
@@ -42,10 +43,12 @@ export default function App() {
             transition={{ duration: 0.18 }}
             style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
           >
-            {view === "send" && <SendEvent key={activeId} />}
-            {view === "inbox" && <Inbox key={activeId} />}
-            {view === "outbox" && <Outbox key={activeId} />}
-            {view === "config" && <Configuration key={activeId} />}
+            <ErrorBoundary resetKey={`${view}:${activeId}`}>
+              {view === "send" && <SendEvent key={activeId} />}
+              {view === "inbox" && <Inbox key={activeId} />}
+              {view === "outbox" && <Outbox key={activeId} />}
+              {view === "config" && <Configuration key={activeId} />}
+            </ErrorBoundary>
           </motion.div>
         </AnimatePresence>
       </main>

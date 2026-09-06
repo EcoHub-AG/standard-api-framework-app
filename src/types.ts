@@ -53,8 +53,15 @@ export type BusMessage = {
   topic: string;
   standardNs: string;
   subject: string;
+  // processId from the event metadata — lets a sent event be traced back /
+  // searched for when coordinating with a counterparty outside EcoHub.
+  processId?: string;
   time: string;
   envelope: Envelope;
+  // Full CloudEvents envelope that was produced, so the Outbox can show the
+  // event payload (like the Inbox's raw-event pane). Optional for back-compat
+  // with records saved before this field existed.
+  rawEvent?: any;
   recipientEncPublicPem: string;
   signerSigPublicPem: string;
   signerName: string;

@@ -69,6 +69,7 @@ export default function SendEvent() {
   // Load the XSD-derived form for legacy processes; everything else uses the free-text data pane.
   useEffect(() => {
     setEvent(null);
+    setEnvelopeText("");
     setValidationErrors([]);
     if (!legacyDef) { setLegacySchema(null); setLegacyError(null); return; }
     let cancelled = false;
@@ -103,6 +104,7 @@ export default function SendEvent() {
     else setDataText("");
     setUploadedFileBytes(null);
     setEvent(null);
+    setEnvelopeText("");
     setValidationErrors([]);
   }, [eventKind, proc, legacyDef]);
 
@@ -220,16 +222,10 @@ export default function SendEvent() {
       });
       setEvent(evt);
       setEnvelopeText(toJSON(evt));
+      // Envelope validation runs reactively in the debounced effect keyed on
+      // envelopeText below, so it re-checks on every manual edit — not only here.
+      // Setting the text above triggers that effect, which finalises the status.
       setStatus("Encrypted & signed — validating envelope…");
-
-      try {
-        const { valid, errors } = await validateAgainstSchema(envelopeSchemaUrl(eventKind, eventTypeDef), evt);
-        setValidationErrors(valid ? [] : errors);
-        setStatus(valid ? "Encrypted & signed — ready to send." : `⚠ Encrypted, but envelope has ${errors.length} schema issue(s) — see below.`);
-      } catch (e) {
-        setValidationErrors([]);
-        setStatus(`Encrypted & signed — ready to send (envelope validation unavailable: ${String((e as Error).message)}).`);
-      }
     } catch (e) {
       setStatus("✗ " + String((e as Error).message));
     }
@@ -241,12 +237,42 @@ export default function SendEvent() {
     try { setEvent(JSON.parse(text)); } catch { /* keep last-valid `event` until it parses again */ }
   }
 
+  // Re-validate the envelope against its schema whenever the (editable) envelope
+  // text changes — not just once at encrypt time. Debounced so we don't validate
+  // on every keystroke; cancellation guards against stale async results.
+  useEffect(() => {
+    if (!envelopeText.trim()) { setValidationErrors([]); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      let parsed: any;
+      try {
+        parsed = JSON.parse(envelopeText);
+      } catch (e) {
+        if (cancelled) return;
+        setValidationErrors([`Invalid JSON: ${String((e as Error).message)}`]);
+        setStatus("⚠ Envelope is not valid JSON — fix it before sending.");
+        return;
+      }
+      try {
+        const { valid, errors } = await validateAgainstSchema(envelopeSchemaUrl(eventKind, eventTypeDef), parsed);
+        if (cancelled) return;
+        setValidationErrors(valid ? [] : errors);
+        setStatus(valid ? "Envelope valid — ready to send." : `⚠ Envelope has ${errors.length} schema issue(s) — see below.`);
+      } catch (e) {
+        if (cancelled) return;
+        setValidationErrors([]);
+        setStatus(`Ready to send (envelope validation unavailable: ${String((e as Error).message)}).`);
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [envelopeText, eventKind, eventTypeDef]);
+
   function recordOutbox() {
     publish({
       id: "m-" + Date.now(), fromProfileId: active.id, fromName: active.name,
       toName: receiver.companyName, toIdp: receiver.idp[0], topic: "eh.saf.in.v1", standardNs: event.dataschema ?? "",
-      subject: event.subject, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      envelope: event.data, recipientEncPublicPem: "", signerSigPublicPem: senderSig!.publicPem, signerName: active.name, status: "sent",
+      subject: event.subject, processId: event.processId, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      envelope: event.data, rawEvent: event, recipientEncPublicPem: "", signerSigPublicPem: senderSig!.publicPem, signerName: active.name, status: "sent",
     });
     bumpBus();
   }
