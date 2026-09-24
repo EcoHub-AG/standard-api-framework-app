@@ -180,6 +180,13 @@ async fn mtls_request(
     }
     if let Some(b) = body {
         rb = rb.header("Content-Type", "application/json").body(b);
+    } else if method.eq_ignore_ascii_case("POST") {
+        // The production gateway (HTTP.sys) answers 411 to a POST that carries neither
+        // Content-Length nor Transfer-Encoding, which is exactly what hyper sends when no
+        // body is set — and setting an empty body is not enough, hyper still omits the
+        // header. Only /v3/keys/{id}/activate is bodyless, so only it ever hit this; the
+        // other environments' gateways let it through, which is why it looked prod-only.
+        rb = rb.header("Content-Length", "0");
     }
 
     let resp = rb.send().await.map_err(|e| e.to_string())?;
