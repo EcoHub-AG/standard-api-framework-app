@@ -10,7 +10,7 @@
 //    whose value is `{ "@selected": "<optionLabel>", "<optionLabel>": {...} }`.
 import type { FieldSchema } from "../formSchema";
 import { fetchText, resolveUrl } from "./loader";
-import { legacyStandardsBase, type LegacyXsdDef } from "../../data/standards";
+import { legacyXsdBase, legacySampleBase, type LegacyXsdDef } from "../../data/standards";
 
 const XS = "http://www.w3.org/2001/XMLSchema";
 const parser = new DOMParser();
@@ -246,11 +246,10 @@ export async function parseXsdForm(rootSchemaUrl: string, rootElementName: strin
 }
 
 /** Fetch + parse a legacy process's XSD form schema and its seed sample values, given its standards.ts metadata. */
-export async function loadLegacyForm(def: LegacyXsdDef): Promise<{ schema: FieldSchema; sample: any }> {
-  const base = legacyStandardsBase(def);
+export async function loadLegacyForm(def: LegacyXsdDef, version: string): Promise<{ schema: FieldSchema; sample: any }> {
   const [{ schema }, sample] = await Promise.all([
-    parseXsdForm(`${base}/${def.xsdFile}`, def.rootElementName),
-    parseSampleXml(`${base}/Testfiles/${encodeURIComponent(def.sampleFile)}`),
+    parseXsdForm(`${legacyXsdBase(def, version)}/${def.xsdFile}`, def.rootElementName),
+    parseSampleXml(`${legacySampleBase(version)}/${encodeURIComponent(def.sampleFile)}`),
   ]);
   return { schema, sample };
 }

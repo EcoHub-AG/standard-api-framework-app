@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Lock, ArrowRight, Send, Copy, Check, FileText, AlertTriangle, RefreshCw, Loader2, Upload } from "lucide-react";
-import { PROCESSES, ALL_PROCESS_NAMES, isProcessName, LEGACY_XSD_NAMESPACE, legacyStandardsBase, type ProcessName } from "../data/standards";
-import { EVENT_TYPES, ALL_EVENT_KINDS, GENERIC_PROCESS_SUGGESTIONS, GENERIC_SUBPROCESS_STAGES, KEY_PROCESS_NAME_OVERRIDES, DEFAULT_PROCESS_NAME_NO_SELECTOR, DEFAULT_SUBPROCESS_NAME_NO_SELECTOR, type EventKind } from "../data/eventTypes";
+import { PROCESSES, ALL_PROCESS_NAMES, isProcessName, LEGACY_XSD_NAMESPACE, legacyXsdBase, resolveLegacyXsd, type ProcessName } from "../data/standards";
+import { EVENT_TYPES, ALL_EVENT_KINDS, GENERIC_PROCESS_SUGGESTIONS, GENERIC_SUBPROCESS_STAGES, SUBPROCESS_NAMES, KEY_PROCESS_NAME_OVERRIDES, DEFAULT_PROCESS_NAME_NO_SELECTOR, type EventKind } from "../data/eventTypes";
 import { useApp } from "../store";
 import FormTree from "../components/FormTree";
 import DetailModal, { type Detail } from "../components/DetailModal";
@@ -28,10 +28,10 @@ export default function SendEvent() {
   const [eventKind, setEventKind] = useState<EventKind>("data");
   const [proc, setProc] = useState<ProcessName>("offer.nlpi");
   const [genericProcessName, setGenericProcessName] = useState(GENERIC_PROCESS_SUGGESTIONS[0]);
-  const [genericSubProcess, setGenericSubProcess] = useState(GENERIC_SUBPROCESS_STAGES[0]);
+  const [nonDataProc, setNonDataProc] = useState<string>(DEFAULT_PROCESS_NAME_NO_SELECTOR);
+  const [subProcess, setSubProcess] = useState(PROCESSES["offer.nlpi"].subProcessName);
 
   // --- Legacy XSD form state (invoice/commission/contract/mandate/claimsExperience) ---
-  const legacyDef = eventKind === "data" ? PROCESSES[proc].legacyXsd : undefined;
   const [mode, setMode] = useState<"form" | "raw">("form");
   const [values, setValues] = useState<any>(deepClone(PROCESSES["offer.nlpi"].sample));
   const [legacySchema, setLegacySchema] = useState<FieldSchema | null>(null);
@@ -59,10 +59,41 @@ export default function SendEvent() {
     const sp = receiver?.supportedProcesses?.map((p) => p.processName).filter(isProcessName) as ProcessName[] | undefined;
     return sp && sp.length ? Array.from(new Set(sp)) : ALL_PROCESS_NAMES;
   }, [receiver]);
-  const processVersion = useMemo(() => {
-    const m = receiver?.supportedProcesses?.find((p) => p.processName === proc);
-    return m?.processVersion || PROCESSES[proc].defaultVersion;
-  }, [receiver, proc]);
+
+  // The process/type identifier currently selected, whichever event kind we're in —
+  // used to look up how many versions the receiver has on file for it.
+  const currentProcessId: string = eventKind === "data" ? proc : eventKind === "generic" ? genericProcessName : nonDataProc;
+
+  const availableVersions = useMemo(() => {
+    const versions = (receiver?.supportedProcesses ?? [])
+      .filter((p) => p.processName === currentProcessId && p.processVersion)
+      .map((p) => p.processVersion!);
+    const unique = Array.from(new Set(versions));
+    if (unique.length) return unique;
+    const fallback = isProcessName(currentProcessId) ? PROCESSES[currentProcessId].defaultVersion : "1.0.0";
+    return [fallback];
+  }, [receiver, currentProcessId]);
+
+  const [versionOverride, setVersionOverride] = useState<string | null>(null);
+  useEffect(() => { setVersionOverride(null); }, [currentProcessId, receiver]);
+  const processVersion = versionOverride ?? availableVersions[0];
+
+  // Depends on processVersion, not just proc — this is what makes the version
+  // dropdown actually change which XSD tag/file gets loaded.
+  const legacyDef = eventKind === "data" ? resolveLegacyXsd(proc, processVersion) : undefined;
+
+  // Version dropdown when the receiver lists more than one version for the current
+  // selection, otherwise the same read-only tag as before — defined once, used beside
+  // every process/type selector below.
+  const versionPicker = availableVersions.length > 1 ? (
+    <div className="selectw" style={{ width: 110 }}>
+      <select value={processVersion} onChange={(e) => setVersionOverride(e.target.value)}>
+        {availableVersions.map((v) => <option key={v} value={v}>{v}</option>)}
+      </select>
+    </div>
+  ) : (
+    <span className="std-tag">processVersion {processVersion}</span>
+  );
 
   useEffect(() => { if (eventKind === "data" && !procOptions.includes(proc)) changeProc(procOptions[0]); }, [procOptions, eventKind]);
 
@@ -75,7 +106,7 @@ export default function SendEvent() {
     let cancelled = false;
     setLegacyLoading(true);
     setLegacyError(null);
-    loadLegacyForm(legacyDef)
+    loadLegacyForm(legacyDef, processVersion)
       .then(({ schema, sample }) => {
         if (cancelled) return;
         setLegacySchema(schema);
@@ -128,6 +159,7 @@ export default function SendEvent() {
 
   function changeProc(p: ProcessName) {
     setProc(p);
+    setSubProcess(PROCESSES[p].subProcessName);
     setValues(deepClone(PROCESSES[p].sample));
   }
 
@@ -175,8 +207,7 @@ export default function SendEvent() {
       }
       const processNameForKey =
         eventKind === "data" ? proc
-        : eventKind === "generic" ? genericProcessName
-        : KEY_PROCESS_NAME_OVERRIDES[eventKind] ?? eventTypeDef.label; // unconfirmed kinds fall back to the label — likely won't match a real key
+        : KEY_PROCESS_NAME_OVERRIDES[eventKind] ?? eventTypeDef.label; // generic → "generic", ids → "ids"; unconfirmed kinds fall back to the label
       const encKey = pickEncryptionKey(km.data, processNameForKey);
       if (!encKey) {
         setDetail({ title: "Fetch receiver public key", status: km.result.status, ok: true, body: km.result.body, url: km.url, method: km.method });
@@ -196,12 +227,12 @@ export default function SendEvent() {
       const dataschema =
         eventKind === "data"
           ? legacyDef
-            ? `${legacyStandardsBase(legacyDef)}/${legacyDef.xsdFile}`
+            ? `${legacyXsdBase(legacyDef, processVersion)}/${legacyDef.xsdFile}`
             : PROCESSES[proc].dataschema?.(processVersion)
           : undefined;
 
-      const processName = eventKind === "data" ? proc : eventKind === "generic" ? genericProcessName : DEFAULT_PROCESS_NAME_NO_SELECTOR;
-      const subProcessName = eventKind === "data" ? PROCESSES[proc].subProcessName : eventKind === "generic" ? genericSubProcess : DEFAULT_SUBPROCESS_NAME_NO_SELECTOR;
+      const processName = eventKind === "data" ? proc : eventKind === "generic" ? genericProcessName : nonDataProc;
+      const subProcessName = subProcess;
       const processStatus = eventKind === "data" ? PROCESSES[proc].processStatus : "active";
       const label = eventKind === "data" ? PROCESSES[proc].label : eventTypeDef.label;
 
@@ -215,7 +246,7 @@ export default function SendEvent() {
         eventReceiver: { category: toCategoryEnum(receiver.memberType), id: idp },
         eventSender: { category: active.membershipType, id: active.credentials.idp },
         processName,
-        processVersion: eventKind === "data" ? processVersion : PROCESSES["offer.nlpi"].defaultVersion,
+        processVersion,
         processStatus,
         subProcessName,
         subProcessStatus: "Created",
@@ -349,7 +380,11 @@ export default function SendEvent() {
           <div className="sel">
             <span className="fl">Event type</span>
             <div className="selectw">
-              <select value={eventKind} onChange={(e) => setEventKind(e.target.value as EventKind)}>
+              <select value={eventKind} onChange={(e) => {
+                const k = e.target.value as EventKind;
+                setEventKind(k); setEvent(null);
+                setSubProcess(k === "data" ? PROCESSES[proc].subProcessName : k === "generic" ? "provide" : k === "ids" ? "initiate" : "request");
+              }}>
                 {ALL_EVENT_KINDS.map((k) => <option key={k} value={k}>{EVENT_TYPES[k].label}</option>)}
               </select>
             </div>
@@ -358,34 +393,51 @@ export default function SendEvent() {
           {eventKind === "data" && (
             <div className="sel">
               <span className="fl">Process (standard)</span>
-              <div className="selectw">
-                <select value={proc} onChange={(e) => changeProc(e.target.value as ProcessName)}>
-                  {procOptions.map((p) => <option key={p} value={p}>{PROCESSES[p].label} ({p})</option>)}
-                </select>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div className="selectw" style={{ flex: 1 }}>
+                  <select value={proc} onChange={(e) => changeProc(e.target.value as ProcessName)}>
+                    {procOptions.map((p) => <option key={p} value={p}>{PROCESSES[p].label} ({p})</option>)}
+                  </select>
+                </div>
+                {versionPicker}
               </div>
-              <span className="std-tag">processVersion {processVersion}</span>
             </div>
           )}
           {eventKind === "generic" && (
-            <>
-              <div className="sel">
-                <span className="fl">Process (free text)</span>
-                <input className="ctl" list="generic-process-suggestions" value={genericProcessName}
-                  onChange={(e) => { setGenericProcessName(e.target.value); setEvent(null); }} />
-                <datalist id="generic-process-suggestions">
-                  {GENERIC_PROCESS_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
-                </datalist>
-              </div>
-              <div className="sel">
-                <span className="fl">Sub-process (workflow stage)</span>
-                <div className="selectw">
-                  <select value={genericSubProcess} onChange={(e) => { setGenericSubProcess(e.target.value); setEvent(null); }}>
-                    {GENERIC_SUBPROCESS_STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
+            <div className="sel">
+              <span className="fl">Process</span>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div className="selectw" style={{ flex: 1 }}>
+                  <select value={genericProcessName} onChange={(e) => { setGenericProcessName(e.target.value); setEvent(null); }}>
+                    {GENERIC_PROCESS_SUGGESTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
+                {versionPicker}
               </div>
-            </>
+            </div>
           )}
+          {eventKind !== "data" && eventKind !== "generic" && (
+            <div className="sel">
+              <span className="fl">Process</span>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div className="selectw" style={{ flex: 1 }}>
+                  <select value={nonDataProc} onChange={(e) => { setNonDataProc(e.target.value); setEvent(null); }}>
+                    {(eventKind === "error" ? Array.from(new Set([...ALL_PROCESS_NAMES, ...GENERIC_PROCESS_SUGGESTIONS])) : ALL_PROCESS_NAMES)
+                      .map((p) => <option key={p} value={p}>{PROCESSES[p as ProcessName]?.label ? `${PROCESSES[p as ProcessName].label} (${p})` : p}</option>)}
+                  </select>
+                </div>
+                {versionPicker}
+              </div>
+            </div>
+          )}
+          <div className="sel">
+            <span className="fl">Sub-process</span>
+            <div className="selectw">
+              <select value={subProcess} onChange={(e) => { setSubProcess(e.target.value); setEvent(null); }}>
+                {(eventKind === "generic" || eventKind === "ids" ? GENERIC_SUBPROCESS_STAGES : SUBPROCESS_NAMES).map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
         </div>
 
         {blocker && (
@@ -409,7 +461,7 @@ export default function SendEvent() {
               </div>
               {legacyDef ? (
                 <>
-                  <button className="btn-copy" style={{ marginRight: 8 }} onClick={() => { loadLegacyForm(legacyDef).then(({ sample }) => setValues(sample)); toast("Sample reloaded"); }}>
+                  <button className="btn-copy" style={{ marginRight: 8 }} onClick={() => { loadLegacyForm(legacyDef, processVersion).then(({ sample }) => setValues(sample)); toast("Sample reloaded"); }}>
                     <FileText size={12} /> Sample
                   </button>
                   <div className="seg">

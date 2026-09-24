@@ -25,30 +25,38 @@ export const EVENT_TYPES: Record<EventKind, EventTypeDef> = {
 
 export const ALL_EVENT_KINDS = Object.keys(EVENT_TYPES) as EventKind[];
 
-// Free-text (datalist-suggested, not enforced) process labels for the Generic
-// Exchange kind — the full GenericProcessNameType.json enum at async-rest-1.2.1.
+// Process names for the Generic Exchange kind's processName dropdown — the
+// full GenericProcessNameType.json enum at async-rest-1.2.1.
 // Note it's "offer", not "offer.nlpi", for this kind.
 export const GENERIC_PROCESS_SUGGESTIONS = [
   "offer", "invoice", "commission", "contract", "mandate", "claimsExperience",
-  "claims", "customerInformation", "brokerInformation",
+  "claims", "information", "customer", "broker",
 ];
 
-// GenericSubProcessNameType.json — workflow-stage values for the Generic
-// Exchange kind's subProcessName (distinct from its processName).
-export const GENERIC_SUBPROCESS_STAGES = ["Initiate", "Provide", "Review", "Decide", "Execute", "Close"];
+// GenericSubProcessNameType.json — workflow-stage values (verbatim lowercase
+// enum), used for the subProcessName of the generic and ids kinds. Note the
+// generic event additionally pins this with `allOf … enum: ["provide"]`, so
+// "provide" is the only value that passes schema validation there.
+export const GENERIC_SUBPROCESS_STAGES = ["initiate", "provide", "review", "decide", "execute", "close"];
+
+// SubProcessNameType.json — subProcessName options for the data/inquiry/error/
+// offerNlpiError kinds (the generic and ids kinds use GENERIC_SUBPROCESS_STAGES).
+export const SUBPROCESS_NAMES = ["request", "offer", "feedback", "conclusionDecision", "billing", "reminder", "contract", "commission", "submission", "cancellation", "claimsExperience"];
 
 // The process-name string used to look up an activated encryption key
-// (PublicKeyInfo.supportedProcesses) for event kinds that have no ProcessName
-// selector in the UI. Confirmed values only — kinds not listed here still fall
-// back to the event type's label, which is very unlikely to match a real key's
-// supportedProcesses and should be replaced once the real value is known.
+// (PublicKeyInfo.supportedProcesses) — the CloudEvents type suffix, not a
+// business process. Real keys carry entries like { processName: "generic" } /
+// { processName: "ids" } alongside the standard processes, so the generic kind
+// must match "generic" (NOT the free-text genericProcessName like "offer").
+// Confirmed values only — kinds not listed here still fall back to the event
+// type's label, which is very unlikely to match a real key's supportedProcesses
+// and should be replaced once the real value is known.
 export const KEY_PROCESS_NAME_OVERRIDES: Partial<Record<EventKind, string>> = {
+  generic: "generic",
   ids: "ids",
 };
 
-// Envelope processName/subProcessName for the kinds with no ProcessName selector
-// (ids/inquiry/error/offerNlpiError) — these still validate against ProcessNameType
-// and GenericSubProcessNameType respectively, so "" / "n/a" are invalid. "contract"
-// and "Initiate" are fixed placeholders (chosen values, not derived from real data).
+// Envelope processName for the kinds with no ProcessName selector
+// (ids/inquiry/error/offerNlpiError) — validates against ProcessNameType (or the
+// ProcessNameAllType superset for saf-error). Fixed placeholder.
 export const DEFAULT_PROCESS_NAME_NO_SELECTOR = "contract";
-export const DEFAULT_SUBPROCESS_NAME_NO_SELECTOR = "Initiate";
