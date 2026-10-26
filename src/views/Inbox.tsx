@@ -9,6 +9,7 @@ import FormTree from "../components/FormTree";
 import JsonView from "../components/JsonView";
 import { toJSON, copyText } from "../lib/format";
 import { decrypt, verify } from "../lib/crypto";
+import { parsePayload, type DecodedPayload } from "../lib/payload";
 import type { Envelope } from "../lib/crypto";
 import { inboxFor, addMessage, type InboxMessage } from "../lib/inboxStore";
 import { kafkaStartConsumer, kafkaStopConsumer, fetchMemberKeys, isTauri } from "../lib/ecohub";
@@ -26,7 +27,7 @@ export default function Inbox() {
 
   const [selId, setSelId] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
-  const [decoded, setDecoded] = useState<any | null>(null);
+  const [decoded, setDecoded] = useState<DecodedPayload | null>(null);
   const [verified, setVerified] = useState<boolean | null>(null);
   const [viewMode, setViewMode] = useState<"form" | "raw">("form");
   const [acked, setAcked] = useState(false);
@@ -117,7 +118,7 @@ export default function Inbox() {
       if (!privKey) throw new Error(`No private key for version "${sel.envelope.publicKeyVersion}". Generate & activate one in Configuration.`);
 
       const clear = await decrypt(sel.envelope, privKey.privatePem);
-      setDecoded(JSON.parse(clear));
+      setDecoded(parsePayload(clear));
 
       try {
         const km = await fetchMemberKeys({
@@ -261,20 +262,25 @@ export default function Inbox() {
                       <div className="pane-head">
                         <span className={"pane-step" + (decoded ? " done" : "")}>2</span>
                         <div className="pane-titles"><div className="pane-title">Decoded payload</div><div className="pane-sub">Cleartext after decryption</div></div>
-                        {decoded && viewMode === "raw" && (
-                          <button className="btn-copy" onClick={() => { copyText(toJSON(decoded)); toast("Copied"); }}><Copy size={12} /> Copy</button>
+                        {decoded && <span className="topic-tag">{decoded.kind.toUpperCase()}</span>}
+                        {decoded && (viewMode === "raw" || decoded.kind === "text") && (
+                          <button className="btn-copy" onClick={() => { copyText(decoded.kind === "json" ? toJSON(decoded.value) : decoded.text); toast("Copied"); }}><Copy size={12} /> Copy</button>
                         )}
-                        <div className="seg" style={{ opacity: decoded ? 1 : 0.4, pointerEvents: decoded ? "auto" : "none" }}>
-                          <button className={viewMode === "form" ? "on" : ""} onClick={() => setViewMode("form")}>Form</button>
-                          <button className={viewMode === "raw" ? "on" : ""} onClick={() => setViewMode("raw")}>Raw</button>
-                        </div>
+                        {decoded?.kind !== "text" && (
+                          <div className="seg" style={{ opacity: decoded ? 1 : 0.4, pointerEvents: decoded ? "auto" : "none" }}>
+                            <button className={viewMode === "form" ? "on" : ""} onClick={() => setViewMode("form")}>Form</button>
+                            <button className={viewMode === "raw" ? "on" : ""} onClick={() => setViewMode("raw")}>Raw</button>
+                          </div>
+                        )}
                       </div>
                       <div className="pane-body">
                         {err ? (
                           <div className="pane-empty"><ShieldAlert style={{ color: "var(--err)" }} strokeWidth={1.5} /><div className="t">Decrypt failed</div><div className="s">{err}</div></div>
                         ) : !decoded ? (
                           <div className="pane-empty"><KeyRound strokeWidth={1.5} /><div className="t">Encrypted</div><div className="s">Decrypt with your private key to reveal the payload and verify the sender's signature.</div></div>
-                        ) : viewMode === "form" ? <FormTree values={decoded} readOnly /> : <JsonView data={decoded} className="code-block-bounded" />}
+                        ) : decoded.kind === "text" || (decoded.kind === "xml" && viewMode === "raw") ? (
+                          <pre className="code-block code-block-bounded">{decoded.text}</pre>
+                        ) : viewMode === "form" ? <FormTree values={decoded.value} readOnly /> : <JsonView data={decoded.value} className="code-block-bounded" />}
                       </div>
                       {decoded && (
                         <div className="pane-foot">

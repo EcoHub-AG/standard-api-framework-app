@@ -261,7 +261,7 @@ export async function parseSampleXml(xmlUrl: string): Promise<any> {
   return elementToValue(doc.documentElement);
 }
 
-function elementToValue(el: Element): any {
+export function elementToValue(el: Element): any {
   const out: any = {};
   const attrs: any = {};
   for (const a of Array.from(el.attributes)) attrs[a.name] = a.value;
